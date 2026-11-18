@@ -29,11 +29,11 @@ Enter the name in **Name**, paste the matching value into **Secret**, and select
 
 ## Build and publish
 
-Push commits to `main` using your normal Git workflow. This automatically runs the complete release workflow; no manual **Run workflow** action is needed. After all checks and builds succeed, the workflow derives the tag from `pubspec.yaml`, creates it at the selected commit if needed, and publishes the packages to GitHub Releases.
+Push commits to `main` using your normal Git workflow. This automatically runs the complete release workflow; no manual **Run workflow** action is needed. Every successful platform build uploads packages to that run's Artifacts. After all checks and builds succeed, an unpublished version is published to GitHub Releases using the tag derived from `pubspec.yaml`, created at the selected commit if needed. If that version is already published, the build still runs and the new packages remain in Artifacts only.
 
 Manual runs remain available from the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml). Choose a branch and **target** to run the full workflow or rebuild selected packages. Pushing a matching version tag also remains supported. Avoid manually starting or pushing a tag for the same commit while its `main` push run is already processing.
 
-Manual dispatch requires the workflow to be present on the default branch. An existing version tag must identify the selected commit. Published releases are never overwritten; publish a new version for changed release packages. A failed draft upload can be retried for the same tag and commit.
+Manual dispatch requires the workflow to be present on the default branch. Published release packages, notes, and tags are never replaced by same-version builds. If an unpublished version tag or draft belongs to another commit, the build produces Artifacts without publishing. A failed draft upload can be retried for the same commit. Update the application version to publish a new release.
 
 The workflow validates version consistency, then runs analysis/tests, Android toolchain preparation, and the macOS build in parallel. Three independent Android jobs build ARM64, ARMv7, and x86_64 after the shared toolchain is ready. A failed architecture does not cancel the other builds.
 
@@ -41,7 +41,7 @@ For a focused rebuild, use the same [Release workflow](https://github.com/CELFS/
 
 | Target | Result |
 | --- | --- |
-| `all` | Build every package, run checks, and publish a complete GitHub Release |
+| `all` | Build every package and run checks; publish only an unpublished version, otherwise retain packages in Artifacts |
 | `android` | Build all three Android architectures; download them from the run's Artifacts |
 | `macos` | Build only the macOS package; download it from the run's Artifacts |
 | `android-arm64-v8a` | Build the ARM64 APK; download it from the run's Artifacts |
@@ -52,7 +52,7 @@ Focused rebuilds still run analysis and tests. They do not create or replace a p
 
 Only the publish job receives repository write permission. It uploads all packages and checksums to a draft before publishing. If organization or repository policy blocks this permission, review [Actions permissions](https://github.com/CELFS/twist-cast/settings/actions). A personal access token is not required.
 
-After completion, open [Releases](https://github.com/CELFS/twist-cast/releases). Successful platform jobs also retain their packages under the workflow run's **Artifacts** for 14 days, even when another platform fails. Artifacts require a GitHub login; published release assets remain attached to the release.
+For a newly published version, open [Releases](https://github.com/CELFS/twist-cast/releases). For same-version builds, open the completed run from the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) and download its **Artifacts**. Successful platform jobs retain their packages there for 14 days, even when another platform fails. Artifacts require a GitHub login; published release assets remain attached to the release.
 
 ## Build performance
 

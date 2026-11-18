@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Build all packages and publish, or rebuild selected packages as workflow artifacts
+        description: Build all packages and publish unpublished versions, or rebuild selected packages as workflow artifacts
         type: choice
         default: all
         options: [all, android, macos, android-arm64-v8a, android-armeabi-v7a, android-x86_64]
@@ -32,7 +32,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       android: ${{ steps.version.outputs.android }}
       macos: ${{ steps.version.outputs.macos }}
-      publish: ${{ steps.version.outputs.publish }}
+      publish: ${{ steps.release-policy.outputs.publish }}
       android_matrix: ${{ steps.version.outputs.android_matrix }}
       notices_abi: ${{ steps.version.outputs.notices_abi }}
     steps:
@@ -43,14 +43,13 @@ jobs:
         env:
           RELEASE_TARGET: ${{ inputs.target || 'all' }}
         run: python3 tool/release.py metadata
-      - name: Check any existing release tag points to this commit
+      - name: Decide whether this version needs publishing
+        id: release-policy
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
-        run: |
-          if commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha 2>/dev/null); then
-            test "$commit" = "$GITHUB_SHA" || { echo 'The version tag already points to another commit.'; exit 1; }
-          fi
+          PUBLISH_REQUESTED: ${{ steps.version.outputs.publish }}
+        run: python3 tool/release.py release-policy
 
   checks:
     needs: metadata
@@ -314,12 +313,19 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Recheck release eligibility before publishing
+        id: release-policy
+        env:
+          PUBLISH_REQUESTED: 'true'
+        run: python3 tool/release.py release-policy
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        if: steps.release-policy.outputs.publish == 'true'
         with:
           pattern: '*-release'
           path: build/release
           merge-multiple: true
       - name: Check the complete asset set and write checksums
+        if: steps.release-policy.outputs.publish == 'true'
         run: |
           test -f "build/release/twist-cast-$VERSION-macos-universal.dmg"
           for abi in arm64-v8a armeabi-v7a x86_64; do
@@ -328,6 +334,7 @@ jobs:
           test -f build/release/THIRD_PARTY_NOTICES.zip
           python3 tool/release.py checksums
       - name: Publish the complete release
+        if: steps.release-policy.outputs.publish == 'true'
         run: |
           cat > build/release-notes.md <<'NOTES'
           Native one-to-one phone screen sharing over a local network, with encrypted pairing and optional internal audio.
@@ -339,9 +346,7 @@ jobs:
           - Checksums and third-party notices are included. iOS, Windows, and Linux packages are not included in this release workflow.
           NOTES
           if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
-            test "$draft" = true || { echo 'Refusing to overwrite a published release.'; exit 1; }
-            commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)
-            test "$commit" = "$GITHUB_SHA" || { echo 'The release tag points to another commit.'; exit 1; }
+            test "$draft" = true || { echo 'This version is already published; keeping workflow artifacts.'; exit 0; }
           else
             gh release create "$TAG" --target "$GITHUB_SHA" --draft --title "TwistCast $VERSION" --notes-file build/release-notes.md
           fi

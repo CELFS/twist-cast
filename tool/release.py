@@ -2,6 +2,7 @@
 # Release metadata and packaging helpers (Python 3, standard library only).
 # Usage from the repository root:
 #   python3 tool/release.py metadata
+#   PUBLISH_REQUESTED=true python3 tool/release.py release-policy
 #   python3 tool/release.py notices
 #   python3 tool/release.py checksums
 #   gh api repos/OWNER/REPO/actions/runs/RUN_ID/jobs | python3 tool/release.py timings
@@ -113,6 +114,43 @@ def metadata():
     }
 
 
+def github_resource(path):
+    result = subprocess.run(['gh', 'api', path], capture_output=True, text=True)
+    if result.returncode == 0:
+        return json.loads(result.stdout)
+    if '(HTTP 404)' in result.stderr:
+        return None
+    raise SystemExit(result.stderr.strip() or 'GitHub API request failed.')
+
+
+def release_policy():
+    publish = False
+    reason = 'Selected packages are available as workflow artifacts only.'
+    if os.environ.get('PUBLISH_REQUESTED') == 'true':
+        repository = os.environ['GITHUB_REPOSITORY']
+        tag = os.environ['TAG']
+        sha = os.environ['GITHUB_SHA']
+        release = github_resource(f'repos/{repository}/releases/tags/{tag}')
+        if release and not release['draft']:
+            reason = 'This version is already published; new packages remain in workflow artifacts.'
+        else:
+            commit = github_resource(f'repos/{repository}/commits/{tag}')
+            if commit is None and release:
+                commit = github_resource(f'repos/{repository}/commits/{release["target_commitish"]}')
+                if commit is None:
+                    raise SystemExit('Cannot resolve the existing draft release target.')
+            if commit is not None and commit['sha'] != sha:
+                reason = 'This version belongs to another commit; new packages remain in workflow artifacts.'
+            else:
+                publish = True
+                reason = 'Publish this unpublished version after all checks and builds succeed.'
+    summary = os.environ.get('GITHUB_STEP_SUMMARY')
+    if summary:
+        with open(summary, 'a') as stream:
+            stream.write(reason + '\n')
+    return {'publish': str(publish).lower(), 'reason': reason}
+
+
 def notices():
     OUTPUT.mkdir(parents=True, exist_ok=True)
     paths = [ROOT / 'LICENSE', ROOT / 'THIRD_PARTY_NOTICES.md',
@@ -172,11 +210,11 @@ def timings():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['metadata', 'notices', 'checksums', 'timings',
+    parser.add_argument('command', choices=['metadata', 'release-policy', 'notices', 'checksums', 'timings',
                                           'macos-input-key', 'save-input-times', 'restore-input-times'])
     command = parser.parse_args().command
-    if command == 'metadata':
-        values = metadata()
+    if command in ('metadata', 'release-policy'):
+        values = metadata() if command == 'metadata' else release_policy()
         output = os.environ.get('GITHUB_OUTPUT')
         if output:
             with open(output, 'a') as stream:

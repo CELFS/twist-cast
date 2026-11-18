@@ -12,6 +12,7 @@
 - Automatically run the full release workflow on pushes to main, while retaining manual platform rebuilds and version-tag triggers.
 - Trim unused platform artifacts from Flutter SDK caches and repair Android toolchain cache extraction over preinstalled SDK files.
 - Preserve unchanged macOS build input timestamps and key native caches by build inputs to reduce unnecessary recompilation and cache uploads.
+- Build same-version commits as workflow artifacts without replacing published releases, and publish only unpublished versions after checks pass.
 
 ## 0.1.0 - Unreleased
 

@@ -43,7 +43,7 @@ Guest Wi-Fi, access-point isolation, VPN routing, and host firewalls can prevent
 
 ## Downloads
 
-Download Android APKs and the macOS universal DMG from [GitHub Releases](https://github.com/CELFS/twist-cast/releases). Packages become available after the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) completes successfully. See [Release builds](docs/releases.md) for signing setup, direct configuration links, and installation instructions.
+Download Android APKs and the macOS universal DMG from [GitHub Releases](https://github.com/CELFS/twist-cast/releases). New versions are published after the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) completes successfully. Same-version builds are available in each run's Artifacts without replacing the published release. See [Release builds](docs/releases.md) for signing setup, direct configuration links, and installation instructions.
 
 ## Development
 
