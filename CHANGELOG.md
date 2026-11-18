@@ -9,6 +9,7 @@
 - Build Android architectures in parallel and support focused platform or architecture rebuilds as workflow artifacts.
 - Cache the Android toolchain and compilation outputs, avoid competing Flutter cache writers, and report per-step build durations.
 - Fix macOS architecture verification, cache Flutter's actual Swift package directory, and save prepared caches before packaging checks.
+- Automatically run the full release workflow on pushes to main, while retaining manual platform rebuilds and version-tag triggers.
 
 ## 0.1.0 - Unreleased
 

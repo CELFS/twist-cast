@@ -29,12 +29,11 @@ Enter the name in **Name**, paste the matching value into **Secret**, and select
 
 ## Build and publish
 
-Commit and push the release configuration using your normal Git workflow. Then either:
+Push commits to `main` using your normal Git workflow. This automatically runs the complete release workflow; no manual **Run workflow** action is needed. After all checks and builds succeed, the workflow derives the tag from `pubspec.yaml`, creates it at the selected commit if needed, and publishes the packages to GitHub Releases.
 
-1. Open [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml), select **Run workflow**, choose the branch containing the release, leave **target** set to **all**, and run it. The workflow derives the tag from `pubspec.yaml`, creates that tag at the selected commit when publishing, and publishes the release after all checks and builds succeed.
-2. Push the matching version tag, such as `v0.1.1`. This starts the same workflow automatically.
+Manual runs remain available from the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml). Choose a branch and **target** to run the full workflow or rebuild selected packages. Pushing a matching version tag also remains supported. Avoid manually starting or pushing a tag for the same commit while its `main` push run is already processing.
 
-Do not start both methods for the same version. Manual dispatch requires the workflow to be present on the default branch. An existing version tag must identify the selected commit. Published releases are never overwritten; publish a new version for changed packages. A failed draft upload can be retried for the same tag and commit.
+Manual dispatch requires the workflow to be present on the default branch. An existing version tag must identify the selected commit. Published releases are never overwritten; publish a new version for changed release packages. A failed draft upload can be retried for the same tag and commit.
 
 The workflow validates version consistency, then runs analysis/tests, Android toolchain preparation, and the macOS build in parallel. Three independent Android jobs build ARM64, ARMv7, and x86_64 after the shared toolchain is ready. A failed architecture does not cancel the other builds.
 
