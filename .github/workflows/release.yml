@@ -287,6 +287,7 @@ jobs:
         run: |
           app=build/macos/Build/Products/Release/TwistCast.app
           lipo "$app/Contents/MacOS/TwistCast" -verify_arch arm64 x86_64
+          test -f "$app/Contents/Frameworks/Sparkle.framework/Sparkle"
           codesign --verify --deep --strict --verbose=2 "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
           mkdir -p build/dmg build/release
