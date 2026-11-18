@@ -21,6 +21,10 @@ internal class ApkDownload(private val context: Context) {
     val id get() = prefs.getLong("id", -1)
     private val installed get() = context.packageManager.getPackageInfo(context.packageName, 0)
 
+    private val installedBuild get() = context.packageManager
+        .getApplicationInfo(context.packageName, PackageManager.GET_META_DATA)
+        .metaData.getInt("app.twist.cast.build").toLong()
+
     // Match the installed APK's ABI, including a 32-bit APK on a 64-bit device.
     private fun abi(): String = ZipFile(context.applicationInfo.sourceDir).use { zip ->
         Build.SUPPORTED_ABIS.first { zip.getEntry("lib/$it/libflutter.so") != null }
@@ -28,12 +32,14 @@ internal class ApkDownload(private val context: Context) {
 
     fun state(): Map<String, Any> {
         val version = requireNotNull(installed.versionName)
-        val state = mutableMapOf<String, Any>("version" to version,
+        val state = mutableMapOf<String, Any>("version" to version, "buildNumber" to installedBuild,
+            "targetBuild" to prefs.getLong("build", 0),
             "platform" to "android-${abi()}", "phase" to "idle", "received" to 0L, "total" to 0L,
             "targetVersion" to (prefs.getString("version", "") ?: ""))
         if (id < 0) return state
         val target = prefs.getString("version", "") ?: ""
-        if (target.isNotEmpty() && compareVersions(target, version) <= 0) {
+        val targetBuild = prefs.getLong("build", 0)
+        if (target.isNotEmpty() && (if (targetBuild > 0) targetBuild <= installedBuild else compareVersions(target, version) <= 0)) {
             manager.remove(id)
             prefs.edit().clear().commit()
             return state
@@ -53,12 +59,14 @@ internal class ApkDownload(private val context: Context) {
         return state
     }
 
-    fun download(version: String, url: String, hash: String) {
+    fun download(version: String, build: Long, url: String, hash: String) {
         require(Regex("[0-9]+\\.[0-9]+\\.[0-9]+").matches(version))
-        require(compareVersions(version, requireNotNull(installed.versionName)) > 0)
+        val comparison = compareVersions(version, requireNotNull(installed.versionName))
+        require(comparison >= 0 && if (build > 0) build > installedBuild else comparison > 0)
         require(Regex("[a-f0-9]{64}").matches(hash))
         val filename = "twist-cast-$version-android-${abi()}.apk"
-        require(url == "https://github.com/CELFS/twist-cast/releases/download/v$version/$filename")
+        val tag = if (build > 0) "v$version-build.$build" else "v$version"
+        require(url == "https://github.com/CELFS/twist-cast/releases/download/$tag/$filename")
         if (prefs.getString("hash", "") == hash && state()["phase"] in listOf("downloading", "ready")) return
         if (id >= 0) manager.remove(id)
         val localName = "$hash.apk"
@@ -70,7 +78,7 @@ internal class ApkDownload(private val context: Context) {
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, localName)
         val next = manager.enqueue(request)
-        prefs.edit().putLong("id", next).putString("version", version).putString("hash", hash)
+        prefs.edit().putLong("id", next).putString("version", version).putLong("build", build).putString("hash", hash)
             .putString("file", destination.absolutePath).commit()
     }
 
@@ -89,12 +97,14 @@ internal class ApkDownload(private val context: Context) {
         val valid = digest.digest().joinToString("") { "%02x".format(it) } == prefs.getString("hash", "")
         if (!valid) { manager.remove(downloadId); error("Package checksum mismatch") }
         val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
-        val candidate = requireNotNull(context.packageManager.getPackageArchiveInfo(requireNotNull(prefs.getString("file", null)), flags))
+        val candidate = requireNotNull(context.packageManager.getPackageArchiveInfo(requireNotNull(prefs.getString("file", null)), flags or PackageManager.GET_META_DATA))
         val current = context.packageManager.getPackageInfo(context.packageName, flags)
         require(candidate.packageName == context.packageName && candidate.versionName == prefs.getString("version", ""))
         val oldCode = if (Build.VERSION.SDK_INT >= 28) current.longVersionCode else current.versionCode.toLong()
         val newCode = if (Build.VERSION.SDK_INT >= 28) candidate.longVersionCode else candidate.versionCode.toLong()
         require(newCode > oldCode)
+        val targetBuild = prefs.getLong("build", 0)
+        if (targetBuild > 0) require(candidate.applicationInfo?.metaData?.getInt("app.twist.cast.build")?.toLong() == targetBuild)
         val oldSigners = if (Build.VERSION.SDK_INT >= 28) requireNotNull(current.signingInfo).apkContentsSigners else current.signatures
         val newSigners = if (Build.VERSION.SDK_INT >= 28) requireNotNull(candidate.signingInfo).apkContentsSigners else candidate.signatures
         require(requireNotNull(oldSigners).toSet() == requireNotNull(newSigners).toSet())
@@ -122,7 +132,8 @@ internal class AppUpdates(private val activity: Activity) : MethodChannel.Method
                 val value = when (call.method) {
                     "status" -> task.state()
                     "download" -> {
-                        task.download(requireNotNull(call.argument("version")), requireNotNull(call.argument("url")), requireNotNull(call.argument("sha256")))
+                        task.download(requireNotNull(call.argument("version")), requireNotNull(call.argument<Number>("buildNumber")).toLong(),
+                            requireNotNull(call.argument("url")), requireNotNull(call.argument("sha256")))
                         null
                     }
                     else -> {

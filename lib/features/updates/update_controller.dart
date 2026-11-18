@@ -6,10 +6,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 class AppRelease {
-  const AppRelease(this.version, this.url, this.sha256);
+  const AppRelease(this.version, this.url, this.sha256, {this.build = 0, this.commit = ''});
   final String version;
   final String url;
   final String sha256;
+  final int build;
+  final String commit;
+  String get label => 'v$version${build > 0 ? "+$build" : ""}${commit.isNotEmpty ? " (${commit.substring(0, 7)})" : ""}';
 }
 
 class UpdateController extends ChangeNotifier {
@@ -28,7 +31,17 @@ class UpdateController extends ChangeNotifier {
   String get installed => state['version'] as String? ?? '';
   String get phase => state['phase'] as String? ?? 'idle';
   bool get busy => working || phase == 'downloading' || phase == 'updating';
-  bool get available => release != null && installed.isNotEmpty && compareVersions(release!.version, installed) > 0;
+  int get installedBuild => (state['buildNumber'] as num?)?.toInt() ?? 0;
+  String get installedLabel => 'v$installed${installedBuild > 0 ? "+$installedBuild" : ""}${installedCommit.length >= 7 ? " (${installedCommit.substring(0, 7)})" : ""}';
+  static const installedCommit = String.fromEnvironment('TWISTCAST_COMMIT');
+  bool get available => release != null && installed.isNotEmpty &&
+    isNewerBuild(release!.version, release!.build, installed, installedBuild);
+
+  static bool isNewerBuild(String version, int build, String installed, int installedBuild) {
+    final comparison = compareVersions(version, installed);
+    // A hash identifies source content; monotonic build numbers determine update order.
+    return comparison >= 0 && (build > 0 ? build > installedBuild : comparison > 0);
+  }
   double? get progress {
     final total = (state['total'] as num?)?.toDouble() ?? 0;
     return total > 0 ? (((state['received'] as num?)?.toDouble() ?? 0) / total).clamp(0, 1) : null;
@@ -74,21 +87,34 @@ class UpdateController extends ChangeNotifier {
       await _status();
       final data = jsonDecode(await _get(Uri.https('api.github.com', '/repos/$_repository/releases/latest'))) as Map<String, dynamic>;
       final tag = data['tag_name'] as String;
-      if (!RegExp(r'^v\d+\.\d+\.\d+$').hasMatch(tag) || data['draft'] != false || data['prerelease'] != false) {
+      final match = RegExp(r'^v(\d+\.\d+\.\d+)(?:-build\.([1-9]\d*))?$').firstMatch(tag);
+      if (match == null || data['draft'] != false || data['prerelease'] != false) {
         throw const FormatException('Not a stable release');
       }
-      final version = tag.substring(1);
+      final version = match.group(1)!;
+      final build = int.tryParse(match.group(2) ?? '') ?? 0;
       final platform = state['platform'] as String;
       final extension = Platform.isAndroid ? 'apk' : 'dmg';
       final filename = 'twist-cast-$version-$platform.$extension';
       final assets = (data['assets'] as List).cast<Map<String, dynamic>>();
+      var commit = '';
+      if (build > 0) {
+        final manifest = assets.singleWhere((entry) => entry['name'] == 'update.json');
+        final identity = jsonDecode(await _get(Uri.parse(_assetUrl(manifest, tag, 'update.json')))) as Map<String, dynamic>;
+        if (identity['schema'] != 1 || identity['version'] != version || identity['build'] != build ||
+            identity['tag'] != tag || identity['commit'] is! String ||
+            !RegExp(r'^[a-f0-9]{40}$').hasMatch(identity['commit'] as String)) {
+          throw const FormatException('Invalid build identity');
+        }
+        commit = identity['commit'] as String;
+      }
       final asset = assets.singleWhere((entry) => entry['name'] == filename);
       final url = _assetUrl(asset, tag, filename);
       final checksums = assets.singleWhere((entry) => entry['name'] == 'SHA256SUMS.txt');
       final sums = await _get(Uri.parse(_assetUrl(checksums, tag, 'SHA256SUMS.txt')));
       final lines = sums.split('\n').map((line) => RegExp(r'^([a-f0-9]{64})  (.+)$').firstMatch(line)).whereType<RegExpMatch>();
       final hash = lines.singleWhere((entry) => entry.group(2) == filename).group(1)!;
-      if (!_disposed) release = AppRelease(version, url, hash);
+      if (!_disposed) release = AppRelease(version, url, hash, build: build, commit: commit);
     } catch (_) {
       if (!_disposed) { error = 'check'; release = null; }
     } finally {
@@ -124,7 +150,8 @@ class UpdateController extends ChangeNotifier {
   Future<void> download() async {
     if (!available || busy || checking) return;
     await _operate('download', {
-      'version': release!.version, 'url': release!.url, 'sha256': release!.sha256,
+      'version': release!.version, 'buildNumber': release!.build,
+      'url': release!.url, 'sha256': release!.sha256,
     });
   }
 

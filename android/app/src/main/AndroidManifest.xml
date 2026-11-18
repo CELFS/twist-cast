@@ -12,6 +12,7 @@
         android:label="TwistCast"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
+        <meta-data android:name="app.twist.cast.build" android:value="${twistcastBuildNumber}" />
         <activity android:name=".UpdateInstallActivity" android:exported="false" />
         <service android:name=".CaptureService" android:exported="false"
             android:foregroundServiceType="mediaProjection" />

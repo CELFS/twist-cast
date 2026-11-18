@@ -18,6 +18,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
       result([
         "platform": "macos-universal",
         "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
+        "buildNumber": Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0,
         "phase": controller.updater.sessionInProgress ? "updating" : failed ? "failed" : "idle",
         "received": 0, "total": 0
       ])

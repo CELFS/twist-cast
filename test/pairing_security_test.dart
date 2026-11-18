@@ -9,6 +9,7 @@ import 'package:twist_cast/features/cast/receiver_page.dart';
 import 'package:twist_cast/features/cast/cast_diagnostics.dart';
 import 'package:twist_cast/features/home/app_brand.dart';
 import 'package:twist_cast/features/home/app_footer.dart';
+import 'package:twist_cast/features/updates/update_controller.dart';
 import 'package:twist_cast/l10n/generated/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:twist_cast/app.dart';
@@ -20,6 +21,19 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   // This suite exercises real LAN sockets, not Flutter's default HTTP stub.
   HttpOverrides.global = null;
+
+  test('updates recognize newer same-version builds and reject older builds', () {
+    expect(UpdateController.isNewerBuild('0.1.5', 10016, '0.1.5', 10015), isTrue);
+    expect(UpdateController.isNewerBuild('0.1.5', 10015, '0.1.5', 10015), isFalse);
+    expect(UpdateController.isNewerBuild('0.1.5', 10014, '0.1.5', 10015), isFalse);
+    expect(UpdateController.isNewerBuild('0.1.4', 10016, '0.1.5', 10015), isFalse);
+    expect(UpdateController.isNewerBuild('0.1.6', 10014, '0.1.5', 10015), isFalse);
+    expect(UpdateController.isNewerBuild('0.1.6', 10016, '0.1.5', 10015), isTrue);
+    expect(UpdateController.isNewerBuild('0.1.6', 0, '0.1.5', 6), isTrue);
+    expect(UpdateController.isNewerBuild('0.1.5', 10015, '0.1.5', 6), isTrue);
+    const release = AppRelease('0.1.5', '', '', build: 10015);
+    expect(release.label, 'v0.1.5+10015');
+  });
 
   testWidgets('desktop starts offline, fits a compact window and switches language', (tester) async {
     const updates = MethodChannel('app.twist.cast/updates');

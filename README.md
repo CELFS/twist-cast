@@ -57,7 +57,7 @@ Guest Wi-Fi, access-point isolation, VPN routing, and host firewalls can prevent
 
 ## Downloads
 
-Download Android APKs and the macOS universal DMG from [GitHub Releases](https://github.com/CELFS/twist-cast/releases). New versions are published after the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) completes successfully. Same-version builds are available in each run's Artifacts without replacing the published release. See [Release builds](docs/releases.md) for signing setup, direct configuration links, and installation instructions.
+Download Android APKs and the macOS universal DMG from [GitHub Releases](https://github.com/CELFS/twist-cast/releases). New builds, including same-version updates, are published after the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) completes successfully. Each published build has its own tag and increasing build number; previous releases remain available. Focused builds are available in each run's Artifacts. See [Release builds](docs/releases.md) for signing setup, direct configuration links, and installation instructions.
 
 ## Development
 
@@ -127,7 +127,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.5`; the build number is `6`.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.5`; the local development build number is `6`. CI assigns increasing build numbers independently for published updates.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 

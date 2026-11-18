@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Publish same-version builds under independent release tags with increasing CI build numbers and commit metadata, preserving previous releases.
+- Detect same-version updates on Android and macOS, display build identities, and validate downloaded Android build metadata before installation.
+- Keep retried older builds from replacing newer releases as Latest.
+
 - Reuse downloaded Swift packages across project configuration changes within the same Xcode toolchain, while retaining native compilation cache compatibility checks.
 - Avoid new macOS compilation cache entries for workflow-only and packaging-helper changes.
 - Validate release inputs before starting platform builds, provide a local preflight command, and report job waiting time separately from execution time.

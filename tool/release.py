@@ -12,6 +12,7 @@
 #   python3 tool/release.py macos-input-key
 #   python3 tool/release.py save-input-times
 #   python3 tool/release.py restore-input-times
+#   python3 tool/release.py update-manifest
 #   python3 tool/release.py appcast
 # Input timestamps are saved with macOS compilation outputs and restored only for identical files.
 # Outputs go to build/release; metadata also writes GitHub Actions job outputs.
@@ -101,8 +102,14 @@ def metadata():
         extension = plistlib.load(stream)
     if (extension['CFBundleShortVersionString'], extension['CFBundleVersion']) != (version, build_number):
         raise SystemExit('The broadcast extension version does not match pubspec.yaml.')
-    tag = f'v{version}'
-    if os.environ.get('GITHUB_REF_TYPE') == 'tag' and os.environ.get('GITHUB_REF_NAME') != tag:
+    # CI assigns one monotonic identity per run; retries keep the same identity.
+    run_number = os.environ.get('GITHUB_RUN_NUMBER')
+    if run_number:
+        if not run_number.isdecimal() or not 0 < int(run_number) < 2099986000:
+            raise SystemExit('Invalid GitHub Actions run number.')
+        build_number = str(10000 + int(run_number))
+    tag = f'v{version}-build.{build_number}'
+    if os.environ.get('GITHUB_REF_TYPE') == 'tag' and os.environ.get('GITHUB_REF_NAME') not in (f'v{version}', tag):
         raise SystemExit('The release tag does not match pubspec.yaml.')
     targets = [
         {'abi': 'arm64-v8a', 'target': 'android-arm64'},
@@ -168,7 +175,7 @@ def release_policy():
         sha = os.environ['GITHUB_SHA']
         release = github_resource(f'repos/{repository}/releases/tags/{tag}')
         if release and not release['draft']:
-            reason = 'This version is already published; new packages remain in workflow artifacts.'
+            reason = 'This build is already published; keeping its existing release assets.'
         else:
             # Missing tag references return 404; the commits endpoint returns 422.
             reference = github_resource(f'repos/{repository}/git/ref/tags/{tag}')
@@ -183,10 +190,21 @@ def release_policy():
                 if commit is None:
                     raise SystemExit('Cannot resolve the existing draft release target.')
             if commit is not None and commit['sha'] != sha:
-                reason = 'This version belongs to another commit; new packages remain in workflow artifacts.'
+                raise SystemExit('This build tag belongs to another commit; refusing to replace it.')
             else:
                 publish = True
-                reason = 'Publish this unpublished version after all checks and builds succeed.'
+                reason = 'Publish this build after all checks and builds succeed.'
+    if publish:
+        latest = github_resource(f'repos/{repository}/releases/latest')
+        if latest:
+            match = re.fullmatch(r'v(\d+\.\d+\.\d+)(?:-build\.([1-9]\d*))?', latest['tag_name'])
+            values = metadata()
+            if match:
+                old_version = tuple(map(int, match.group(1).split('.')))
+                new_version = tuple(map(int, values['version'].split('.')))
+                if old_version > new_version or int(match.group(2) or 0) >= int(values['build_number']):
+                    publish = False
+                    reason = 'A newer release is already published; keeping this build as workflow artifacts.'
     summary = os.environ.get('GITHUB_STEP_SUMMARY')
     if summary:
         with open(summary, 'a') as stream:
@@ -215,13 +233,25 @@ def appcast():
     ElementTree.SubElement(item, f'{{{sparkle}}}shortVersionString').text = version
     ElementTree.SubElement(item, f'{{{sparkle}}}minimumSystemVersion').text = '12.0'
     ElementTree.SubElement(item, 'enclosure', {
-        'url': f'https://github.com/CELFS/twist-cast/releases/download/v{version}/{filename}',
+        'url': f'https://github.com/CELFS/twist-cast/releases/download/{values["tag"]}/{filename}',
         'length': str(archive.stat().st_size),
         'type': 'application/octet-stream',
         f'{{{sparkle}}}edSignature': signature,
     })
     ElementTree.ElementTree(rss).write(OUTPUT / 'appcast.xml', encoding='utf-8', xml_declaration=True)
     print(OUTPUT / 'appcast.xml')
+
+
+def update_manifest():
+    values = metadata()
+    commit = os.environ['GITHUB_SHA']
+    if not re.fullmatch(r'[a-f0-9]{40}', commit):
+        raise SystemExit('Invalid release commit.')
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    (OUTPUT / 'update.json').write_text(json.dumps({
+        'schema': 1, 'version': values['version'], 'build': int(values['build_number']),
+        'tag': values['tag'], 'commit': commit,
+    }, indent=2) + '\n')
 
 
 def notices():
@@ -291,7 +321,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['metadata', 'release-policy', 'notices', 'checksums', 'timings', 'appcast',
                                           'macos-input-key', 'save-input-times', 'restore-input-times',
-                                          'check-inputs', 'preflight'])
+                                          'check-inputs', 'preflight', 'update-manifest'])
     command = parser.parse_args().command
     if command in ('metadata', 'release-policy'):
         values = metadata() if command == 'metadata' else release_policy()
@@ -308,6 +338,8 @@ def main():
         notices()
     elif command == 'checksums':
         checksums()
+    elif command == 'update-manifest':
+        update_manifest()
     elif command == 'appcast':
         appcast()
     elif command == 'macos-input-key':

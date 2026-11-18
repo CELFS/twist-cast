@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: Build all packages and publish unpublished versions, or rebuild selected packages as workflow artifacts
+        description: Build all packages and publish new builds, or rebuild selected packages as workflow artifacts
         type: choice
         default: all
         options: [all, android, macos, android-arm64-v8a, android-armeabi-v7a, android-x86_64]
@@ -29,6 +29,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       version: ${{ steps.version.outputs.version }}
+      build_number: ${{ steps.version.outputs.build_number }}
       tag: ${{ steps.version.outputs.tag }}
       android: ${{ steps.version.outputs.android }}
       macos: ${{ steps.version.outputs.macos }}
@@ -45,7 +46,7 @@ jobs:
         env:
           RELEASE_TARGET: ${{ inputs.target || 'all' }}
         run: python3 tool/release.py metadata
-      - name: Decide whether this version needs publishing
+      - name: Decide whether this build needs publishing
         id: release-policy
         env:
           GH_TOKEN: ${{ github.token }}
@@ -162,7 +163,7 @@ jobs:
         id: build
         env:
           TARGET: ${{ matrix.target }}
-        run: flutter build apk --release --split-per-abi --target-platform "$TARGET" --no-pub
+        run: flutter build apk --release --split-per-abi --target-platform "$TARGET" --build-number "${{ needs.metadata.outputs.build_number }}" --dart-define="TWISTCAST_COMMIT=$GITHUB_SHA" --no-pub
       - name: Save Flutter compilation outputs before packaging
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
         if: steps.flutter-build-cache.outputs.cache-hit != 'true'
@@ -175,13 +176,20 @@ jobs:
         env:
           VERSION: ${{ needs.metadata.outputs.version }}
           ABI: ${{ matrix.abi }}
+          BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
           NOTICES_ABI: ${{ needs.metadata.outputs.notices_abi }}
           ANDROID_BUILD_TOOLS: ${{ steps.toolchain.outputs.build-tools }}
         run: |
           apk="build/app/outputs/flutter-apk/app-$ABI-release.apk"
           "$ANDROID_BUILD_TOOLS/apksigner" verify "$apk"
           APK="$apk" python3 - <<'PY'
-          import os, zipfile
+          import os, re, subprocess, zipfile
+          badging = subprocess.check_output([os.environ["ANDROID_BUILD_TOOLS"] + "/aapt", "dump", "badging", os.environ["APK"]], text=True)
+          code = int(re.search(r"versionCode='([0-9]+)'", badging).group(1))
+          version = re.search(r"versionName='([^']+)'", badging).group(1)
+          offsets = {"armeabi-v7a": 1000, "arm64-v8a": 2000, "x86_64": 4000}
+          if code != int(os.environ["BUILD_NUMBER"]) + offsets[os.environ["ABI"]] or version != os.environ["VERSION"]:
+              raise SystemExit("APK build identity does not match the release.")
           with zipfile.ZipFile(os.environ['APK']) as apk:
               abis = {name.split('/')[1] for name in apk.namelist() if name.startswith('lib/') and name.endswith('.so')}
           if abis != {os.environ['ABI']}:
@@ -263,7 +271,7 @@ jobs:
         run: python3 tool/release.py restore-input-times
       - name: Compile macOS application
         id: build
-        run: flutter build macos --release --no-pub
+        run: flutter build macos --release --build-number "${{ needs.metadata.outputs.build_number }}" --dart-define="TWISTCAST_COMMIT=$GITHUB_SHA" --no-pub
       - name: Save resolved Swift packages
         if: ${{ !cancelled() && steps.build.outcome != 'skipped' && steps.swift-cache.outcome == 'success' && steps.swift-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -294,6 +302,7 @@ jobs:
           test -f "$app/Contents/Frameworks/Sparkle.framework/Sparkle"
           codesign --verify --deep --strict --verbose=2 "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "${{ needs.metadata.outputs.build_number }}"
           mkdir -p build/dmg build/release
           ditto "$app" build/dmg/TwistCast.app
           ln -s /Applications build/dmg/Applications
@@ -326,6 +335,7 @@ jobs:
       GH_TOKEN: ${{ github.token }}
       TAG: ${{ needs.metadata.outputs.tag }}
       VERSION: ${{ needs.metadata.outputs.version }}
+      BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
@@ -350,6 +360,7 @@ jobs:
             test -f "build/release/twist-cast-$VERSION-android-$abi.apk"
           done
           test -f build/release/THIRD_PARTY_NOTICES.zip
+          python3 tool/release.py update-manifest
           python3 tool/release.py checksums
       - name: Publish the complete release
         if: steps.release-policy.outputs.publish == 'true'
@@ -364,12 +375,12 @@ jobs:
           - Checksums and third-party notices are included. iOS, Windows, and Linux packages are not included in this release workflow.
           NOTES
           if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
-            test "$draft" = true || { echo 'This version is already published; keeping workflow artifacts.'; exit 0; }
+            test "$draft" = true || { echo 'This build is already published; keeping its existing assets.'; exit 0; }
           else
-            gh release create "$TAG" --target "$GITHUB_SHA" --draft --title "TwistCast $VERSION" --notes-file build/release-notes.md
+            gh release create "$TAG" --target "$GITHUB_SHA" --draft --prerelease=false --title "TwistCast $VERSION (build $BUILD_NUMBER)" --notes-file build/release-notes.md
           fi
           gh release upload "$TAG" build/release/* --clobber
-          gh release edit "$TAG" --draft=false --notes-file build/release-notes.md
+          gh release edit "$TAG" --draft=false --latest --notes-file build/release-notes.md
 
   timings:
     needs: [metadata, checks, android-toolchain, android, macos, publish]

@@ -44,8 +44,8 @@ class _UpdateCardState extends State<UpdateCard> {
           IconButton(onPressed: locked ? null : _updates.check,
             tooltip: text.updateCheck, icon: const Icon(Icons.refresh)),
         ]),
-        Text('${text.updateInstalled} · ${_updates.installed.isEmpty ? text.versionLabel : 'v${_updates.installed}'}'),
-        if (_updates.release != null) Text('${text.updateLatest} · v${_updates.release!.version}'),
+        Text('${text.updateInstalled} · ${_updates.installed.isEmpty ? text.versionLabel : _updates.installedLabel}'),
+        if (_updates.release != null) Text('${text.updateLatest} · ${_updates.release!.label}'),
         if (_updates.checking || _updates.busy) ...[
           const SizedBox(height: 12),
           LinearProgressIndicator(value: _updates.phase == 'downloading' ? _updates.progress : null),
@@ -56,7 +56,7 @@ class _UpdateCardState extends State<UpdateCard> {
         if (_updates.phase == 'ready') ...[
           const SizedBox(height: 12),
           FilledButton.icon(onPressed: locked ? null : () => _updates.install(text.updateInstallFailed),
-            icon: const Icon(Icons.install_mobile), label: Text('${text.updateInstall} · v${_updates.state['targetVersion']}')),
+            icon: const Icon(Icons.install_mobile), label: Text('${text.updateInstall} · v${_updates.state['targetVersion']}${(_updates.state['targetBuild'] as num? ?? 0) > 0 ? '+${_updates.state['targetBuild']}' : ''}')),
         ] else if (_updates.available) ...[
           const SizedBox(height: 12),
           FilledButton.icon(onPressed: locked ? null : _updates.download,
