@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
+import 'cast_diagnostics.dart';
+
 class CastMedia {
   CastMedia({required this.send, required this.onStopped, required this.onConnected});
   final void Function(Map<String, dynamic>) send;
@@ -12,6 +14,7 @@ class CastMedia {
   final renderer = RTCVideoRenderer();
   static const _native = MethodChannel('app.twist.cast/capture');
   RTCPeerConnection? _peer;
+  CastDiagnostics? _diagnostics;
   MediaStream? _stream;
   StreamSubscription<dynamic>? _events;
   final _pendingIce = <RTCIceCandidate>[];
@@ -22,12 +25,17 @@ class CastMedia {
   bool _reportedPlaying = false;
 
   Future<void> prepare() async {
-    await WebRTC.initialize(options: {'bypassVoiceProcessing': true});
+    await WebRTC.initialize(options: {
+      'bypassVoiceProcessing': true,
+      // LAN screen interaction prioritizes freshness over playout smoothing.
+      'zeroPlayoutDelay': Platform.isMacOS,
+    });
     await renderer.initialize();
     _initialized = true;
     if (_closed) { await renderer.dispose(); return; }
     _peer = await createPeerConnection({'iceServers': <dynamic>[], 'sdpSemantics': 'unified-plan'});
     if (_closed) { await _peer?.dispose(); return; }
+    _diagnostics = CastDiagnostics(_peer!);
     _peer!.onIceCandidate = (candidate) {
       if (!_closed && candidate.candidate != null) {
         send({'type': 'ice', 'candidate': candidate.candidate,
@@ -45,6 +53,9 @@ class CastMedia {
     };
     _peer!.onConnectionState = (state) {
       if (_closed) return;
+      if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        _diagnostics?.start();
+      }
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
           state == RTCPeerConnectionState.RTCPeerConnectionStateClosed) { onStopped(); }
     };
@@ -149,6 +160,7 @@ class CastMedia {
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _diagnostics?.dispose();
     Object? failure;
     Future<void> release(Future<void> Function() action) async {
       try { await action(); } catch (error) { failure ??= error; }

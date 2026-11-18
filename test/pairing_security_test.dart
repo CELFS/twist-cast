@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:twist_cast/features/cast/receiver_page.dart';
+import 'package:twist_cast/features/cast/cast_diagnostics.dart';
 import 'package:twist_cast/features/home/app_brand.dart';
 import 'package:twist_cast/features/home/app_footer.dart';
 import 'package:twist_cast/l10n/generated/app_localizations.dart';
@@ -98,6 +99,26 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await renderer.dispose();
+  });
+
+  test('media diagnostics measure interval delay and discard reset counters', () {
+    final samples = CastStatsSamples();
+    StatsReport video(double delay, int count) => StatsReport('video', 'inbound-rtp', 0, {
+      'kind': 'video', 'jitterBufferDelay': delay, 'jitterBufferEmittedCount': count,
+      'codecId': 'codec', 'privateValue': 'must not be logged',
+    });
+    expect(samples.add([video(100, 1000)]).single.containsKey('jitterBufferMs'), isFalse);
+    final metrics = samples.add([video(120, 1010),
+      StatsReport('codec', 'codec', 0, {'mimeType': 'video/H264'}),
+      StatsReport('transport', 'transport', 0, {'selectedCandidatePairId': 'selected'}),
+      StatsReport('selected', 'candidate-pair', 0, {'currentRoundTripTime': 0.025}),
+      StatsReport('unused', 'candidate-pair', 0, {'currentRoundTripTime': 9}),
+    ]);
+    expect(metrics.first['jitterBufferMs'], 2000);
+    expect(metrics.first['codec'], 'video/H264');
+    expect(metrics.last, {'networkRttMs': 25});
+    expect(metrics.toString(), isNot(contains('privateValue')));
+    expect(samples.add([video(1, 10)]).single.containsKey('jitterBufferMs'), isFalse);
   });
 
   test('rejects public, loopback, expired and malformed QR invitations', () {

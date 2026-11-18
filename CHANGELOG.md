@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Enable low-delay video playout on macOS receivers and log interval encoding, sending, decoding, buffering, and network timing metrics for latency diagnosis.
+
 - Enforce the Android screen video source frame rate before encoding and allow resolution adaptation to preserve motion under load.
 - Preserve the correct capture dimensions when screen sharing starts in landscape orientation.
 
