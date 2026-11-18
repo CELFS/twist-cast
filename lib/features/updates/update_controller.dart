@@ -60,16 +60,36 @@ class UpdateController extends ChangeNotifier {
   void _changed() { if (!_disposed) notifyListeners(); }
 
   Future<String> _get(Uri uri) async {
-    final request = await _http.getUrl(uri).timeout(const Duration(seconds: 20));
-    request.headers.set(HttpHeaders.userAgentHeader, 'TwistCast');
-    final response = await request.close().timeout(const Duration(seconds: 20));
-    if (response.statusCode != 200) throw HttpException('Update HTTP ${response.statusCode}');
-    final bytes = <int>[];
-    await for (final chunk in response.timeout(const Duration(seconds: 20))) {
-      bytes.addAll(chunk);
-      if (bytes.length > 2 * 1024 * 1024) throw const FormatException('Update metadata too large');
+    HttpClientRequest? request;
+    Future<String> read() async {
+      request = await _http.getUrl(uri);
+      request!.headers.set(HttpHeaders.userAgentHeader, 'TwistCast');
+      final response = await request!.close();
+      if (response.statusCode != 200) {
+        final rateLimited = response.statusCode == 429 ||
+          (response.statusCode == 403 && response.headers.value('x-ratelimit-remaining') == '0');
+        throw UpdateHttpException(response.statusCode, rateLimited);
+      }
+      final bytes = <int>[];
+      await for (final chunk in response) {
+        bytes.addAll(chunk);
+        if (bytes.length > 2 * 1024 * 1024) throw const FormatException('Update metadata too large');
+      }
+      return utf8.decode(bytes);
     }
-    return utf8.decode(bytes);
+    try {
+      return await read().timeout(const Duration(seconds: 20));
+    } catch (_) {
+      request?.abort();
+      rethrow;
+    }
+  }
+
+  static String checkError(Object error) {
+    if (error is SocketException || error is TimeoutException || error is HandshakeException) return 'checkNetwork';
+    if (error is UpdateHttpException) return error.rateLimited ? 'checkRateLimit' : 'checkService';
+    if (error is FormatException || error is StateError || error is TypeError) return 'checkMetadata';
+    return 'check';
   }
 
   String _assetUrl(Map<String, dynamic> asset, String tag, String filename) {
@@ -115,8 +135,9 @@ class UpdateController extends ChangeNotifier {
       final lines = sums.split('\n').map((line) => RegExp(r'^([a-f0-9]{64})  (.+)$').firstMatch(line)).whereType<RegExpMatch>();
       final hash = lines.singleWhere((entry) => entry.group(2) == filename).group(1)!;
       if (!_disposed) release = AppRelease(version, url, hash, build: build, commit: commit);
-    } catch (_) {
-      if (!_disposed) { error = 'check'; release = null; }
+    } catch (failure) {
+      if (!_disposed) { error = checkError(failure); release = null; }
+      debugPrint('[TwistCast update] ${checkError(failure)} (${failure.runtimeType})');
     } finally {
       checking = false;
       _changed();
@@ -178,4 +199,10 @@ class UpdateController extends ChangeNotifier {
     _http.close(force: true);
     super.dispose();
   }
+}
+
+class UpdateHttpException implements Exception {
+  const UpdateHttpException(this.statusCode, this.rateLimited);
+  final int statusCode;
+  final bool rateLimited;
 }

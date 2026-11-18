@@ -1,6 +1,6 @@
 # Release builds
 
-TwistCast 0.1.5 uses Flutter 3.50.0 and Dart 3.14.0. The application version is `0.1.5`; its local development build number is `6`. `pubspec.yaml` stores these as `0.1.5+6`. CI overrides the internal build number with `10000 + GITHUB_RUN_NUMBER` for every platform; retries of the same run keep the same number.
+TwistCast 0.1.6 uses Flutter 3.50.0 and Dart 3.14.0. The application version is `0.1.6`; its local development build number is `7`. `pubspec.yaml` stores these as `0.1.6+7`. CI overrides the internal build number with `10000 + GITHUB_RUN_NUMBER` for every platform; retries of the same run keep the same number.
 
 ## Direct links
 
@@ -53,7 +53,7 @@ python3 tool/release.py preflight
 
 This validates version fields, property lists, entitlements, and the public update key, then runs analysis and tests without fetching packages. On macOS it also checks Xcode project syntax. It does not install tools or dependencies, build native packages, or verify private signing secrets. A full macOS build still requires Xcode. The workflow runs the release input checks before starting platform jobs and repeats the preflight checks in its checks job.
 
-Push commits to `main` using your normal Git workflow. This automatically runs the complete release workflow; no manual **Run workflow** action is needed. Every successful platform build uploads packages to that run's Artifacts. After all checks and builds succeed, each new build is published to GitHub Releases with its own tag, such as `v0.1.5-build.10015`. The application version may remain unchanged. The tag points to the selected commit, and the release includes `update.json` with the version, build number, and full commit hash. The complete release is explicitly marked Latest only after all assets are uploaded.
+Push commits to `main` using your normal Git workflow. This automatically runs the complete release workflow; no manual **Run workflow** action is needed. Every successful platform build uploads packages to that run's Artifacts. After all checks and builds succeed, each new build is published to GitHub Releases with its own tag, such as `v0.1.6-build.10015`. The application version may remain unchanged. The tag points to the selected commit, and the release includes `update.json` with the version, build number, and full commit hash. The complete release is explicitly marked Latest only after all assets are uploaded.
 
 Manual runs remain available from the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml). Choose a branch and **target** to run the full workflow or rebuild selected packages. Pushing a matching version tag also remains supported. Avoid manually starting or pushing a tag for the same commit while its `main` push run is already processing.
 
@@ -99,10 +99,10 @@ Clients shipped before build-aware updates only recognize plain version tags. In
 
 | Asset | Use |
 | --- | --- |
-| `twist-cast-0.1.5-android-arm64-v8a.apk` | Most current Android phones, including current Redmi devices |
-| `twist-cast-0.1.5-android-armeabi-v7a.apk` | Older 32-bit ARM Android devices |
-| `twist-cast-0.1.5-android-x86_64.apk` | x86_64 Android devices and compatible emulators |
-| `twist-cast-0.1.5-macos-universal.dmg` | Apple Silicon and Intel Macs, macOS 12 or newer |
+| `twist-cast-0.1.6-android-arm64-v8a.apk` | Most current Android phones, including current Redmi devices |
+| `twist-cast-0.1.6-android-armeabi-v7a.apk` | Older 32-bit ARM Android devices |
+| `twist-cast-0.1.6-android-x86_64.apk` | x86_64 Android devices and compatible emulators |
+| `twist-cast-0.1.6-macos-universal.dmg` | Apple Silicon and Intel Macs, macOS 12 or newer |
 | `THIRD_PARTY_NOTICES.zip` | Vendored source notices and Flutter-generated Android package notices |
 | `SHA256SUMS.txt` | SHA-256 checksums of the release assets |
 | `update.json` | Application version, CI build number, release tag, and commit hash |
@@ -136,4 +136,4 @@ The APKs are written to `build/app/outputs/flutter-apk/`. Release builds without
 
 Update `pubspec.yaml` with the next application version and a strictly larger build number. Update the displayed version in both ARB files and the English footer label, the broadcast extension's version/build number, and the version references in the documentation. Keep using the same Android signing key.
 
-Run `python3 tool/release.py metadata` to verify the version fields. CI release tags combine the application version and assigned build number, for example `v0.1.5-build.10015`. A plain version tag can still trigger the workflow, but the resulting release uses the assigned build tag. Routine same-version CI updates do not require editing `pubspec.yaml`. Local builds retain its development build number and cannot replace a newer CI installation without an explicitly higher build number.
+Run `python3 tool/release.py metadata` to verify the version fields. CI release tags combine the application version and assigned build number, for example `v0.1.6-build.10015`. A plain version tag can still trigger the workflow, but the resulting release uses the assigned build tag. Routine same-version CI updates do not require editing `pubspec.yaml`. Local builds retain its development build number and cannot replace a newer CI installation without an explicitly higher build number.

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.6 - Unreleased
+
+- Move macOS receiver controls into a titlebar button and an on-demand overlay, keeping the shared screen free of a separate toolbar.
+- Allow update checks during screen sharing while keeping downloads and installation disabled until the session ends.
+- Distinguish update connection failures, GitHub rate limits, service errors, and invalid release metadata, and bound each request by a total timeout.
+- Avoid an unnecessary full-frame rotation copy when rendering unrotated video on Apple platforms.
+
 ## Unreleased
 
 - Publish same-version builds under independent release tags with increasing CI build numbers and commit metadata, preserving previous releases.

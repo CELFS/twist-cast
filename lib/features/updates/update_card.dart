@@ -41,7 +41,7 @@ class _UpdateCardState extends State<UpdateCard> {
       children: [
         Row(children: [
           Expanded(child: Text(text.updateCheck, style: Theme.of(context).textTheme.titleMedium)),
-          IconButton(onPressed: locked ? null : _updates.check,
+          IconButton(onPressed: _updates.busy || _updates.checking ? null : _updates.check,
             tooltip: text.updateCheck, icon: const Icon(Icons.refresh)),
         ]),
         Text('${text.updateInstalled} · ${_updates.installed.isEmpty ? text.versionLabel : _updates.installedLabel}'),
@@ -66,8 +66,15 @@ class _UpdateCardState extends State<UpdateCard> {
         if (widget.sessionActive) Text(text.updateStopSession),
         if (_updates.error != null || _updates.phase == 'failed') ...[
           const SizedBox(height: 8),
-          Text(_updates.error == 'check' ? text.updateCheckFailed : _updates.error == 'install'
-            ? text.updateInstallFailed : text.updateDownloadFailed,
+          Text(switch (_updates.error) {
+            'checkNetwork' => text.updateNetworkFailed,
+            'checkRateLimit' => text.updateRateLimited,
+            'checkService' => text.updateServiceFailed,
+            'checkMetadata' => text.updateMetadataFailed,
+            'check' => text.updateCheckFailed,
+            'install' => text.updateInstallFailed,
+            _ => text.updateDownloadFailed,
+          },
             style: TextStyle(color: Theme.of(context).colorScheme.error)),
         ],
       ],

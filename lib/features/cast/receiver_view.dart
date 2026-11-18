@@ -5,14 +5,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../l10n/generated/app_localizations.dart';
+import 'receiver_toolbar.dart';
 
 class ReceiverView extends StatefulWidget {
   const ReceiverView({required this.renderer, required this.onStop,
-    required this.headerVisible, required this.onToggleHeader, super.key});
+    required this.headerVisible, required this.onToggleHeader, this.showControls = true, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool headerVisible;
+  final bool showControls;
   final VoidCallback onToggleHeader;
 
   @override
@@ -73,26 +74,10 @@ class _ReceiverViewState extends State<ReceiverView> {
 
   @override
   Widget build(BuildContext context) {
-    final text = AppLocalizations.of(context);
     return Column(children: [
-      SizedBox(height: 48, child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: Row(children: [
-          Tooltip(message: text.secureSession, child: const Icon(Icons.lock_outline, size: 18)),
-          if (_resizeFailed) ...[
-            const SizedBox(width: 8),
-            Tooltip(message: text.resizeWindowFailed, child: Icon(Icons.warning_amber,
-              size: 18, color: Theme.of(context).colorScheme.error)),
-          ],
-          const Spacer(),
-          IconButton(onPressed: widget.onToggleHeader,
-            tooltip: widget.headerVisible ? text.hideHeader : text.showHeader,
-            icon: Icon(widget.headerVisible ? Icons.expand_less : Icons.expand_more)),
-          const SizedBox(width: 8),
-          OutlinedButton.icon(onPressed: widget.onStop, icon: const Icon(Icons.stop_circle_outlined, size: 18),
-            label: Text(text.stop)),
-        ]),
-      )),
+      if (widget.showControls) ReceiverToolbar(onStop: widget.onStop,
+        onToggleHeader: widget.onToggleHeader, headerVisible: widget.headerVisible,
+        resizeFailed: _resizeFailed),
       Expanded(child: LayoutBuilder(builder: (context, constraints) =>
         ValueListenableBuilder<RTCVideoValue>(valueListenable: widget.renderer, builder: (context, value, _) {
           final viewport = Size(constraints.maxWidth, constraints.maxHeight);

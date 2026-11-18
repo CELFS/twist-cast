@@ -10,6 +10,7 @@ import 'package:twist_cast/features/cast/cast_diagnostics.dart';
 import 'package:twist_cast/features/home/app_brand.dart';
 import 'package:twist_cast/features/home/app_footer.dart';
 import 'package:twist_cast/features/updates/update_controller.dart';
+import 'package:twist_cast/features/updates/update_card.dart';
 import 'package:twist_cast/l10n/generated/app_localizations.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:twist_cast/app.dart';
@@ -47,14 +48,14 @@ void main() {
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.5'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.6'), findsOneWidget);
     expect(tester.getBottomRight(find.byType(AppFooter)).dy, 600);
     expect(tester.getTopLeft(find.byType(AppBrand)).dx, 16);
     expect(find.text('Connected · encrypted screen sharing'), findsNothing);
     await tester.tap(find.byType(DropdownButton<Locale>));
     await tester.pumpAndSettle();
     if (Platform.isMacOS || Platform.isAndroid) {
-      expect(find.text('Could not check for updates. Check your connection to GitHub and try again.'), findsOneWidget);
+      expect(find.text('Could not check for updates. Please try again.'), findsOneWidget);
     }
     await tester.tap(find.text('简体中文').last);
     await tester.pumpAndSettle();
@@ -69,7 +70,10 @@ void main() {
     const window = MethodChannel('app.twist.cast/window');
     final calls = <MethodCall>[];
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(window, (call) async { calls.add(call); return null; });
+    messenger.setMockMethodCallHandler(window, (call) async {
+      if (call.method == 'fitVideo') calls.add(call);
+      return null;
+    });
     addTearDown(() => messenger.setMockMethodCallHandler(window, null));
     final renderer = RTCVideoRenderer();
     renderer.value = renderer.value.copyWith(width: 1080, height: 2400);
@@ -113,6 +117,82 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
     await renderer.dispose();
+  });
+
+  testWidgets('native receiver controls overlay video without resizing it', (tester) async {
+    if (!Platform.isMacOS) return;
+    const window = MethodChannel('app.twist.cast/window');
+    final calls = <MethodCall>[];
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(window, (call) async {
+      calls.add(call);
+      return call.method == 'receiverControls' ? call.arguments['enabled'] : null;
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(window, null));
+    final renderer = RTCVideoRenderer();
+    renderer.value = renderer.value.copyWith(width: 1080, height: 2400);
+    var stopped = false;
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: ReceiverPage(renderer: renderer, onStop: () { stopped = true; },
+        header: AppBar(title: const AppBrand())),
+    ));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    final fits = calls.where((call) => call.method == 'fitVideo').toList();
+    expect(fits.last.arguments['chromeHeight'], 0);
+    expect(find.text('Stop'), findsNothing);
+    expect(find.byType(AppBrand), findsNothing);
+    expect(find.byType(AppFooter), findsNothing);
+    await messenger.handlePlatformMessage(window.name,
+      const StandardMethodCodec().encodeMethodCall(const MethodCall('toggleReceiverControls')), (_) {});
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(find.text('Stop'), findsOneWidget);
+    expect(find.byType(AppBrand), findsOneWidget);
+    expect(calls.where((call) => call.method == 'fitVideo').length, fits.length);
+    await tester.tap(find.byType(OutlinedButton));
+    expect(stopped, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pump();
+    expect(find.text('Stop'), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pump();
+    expect(calls.last.method, 'receiverControls');
+    expect(calls.last.arguments['enabled'], isFalse);
+    await renderer.dispose();
+  });
+
+  testWidgets('update checks can be retried while screen sharing is active', (tester) async {
+    const updates = MethodChannel('app.twist.cast/updates');
+    var checks = 0;
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(updates, (_) async {
+      checks++;
+      throw PlatformException(code: 'offline');
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(updates, null));
+    await tester.pumpWidget(MaterialApp(
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: AppLocalizations.supportedLocales,
+      home: Scaffold(body: UpdateCard(sessionActive: true, onInstallingChanged: (_) {})),
+    ));
+    await tester.pumpAndSettle();
+    expect(checks, 1);
+    await tester.tap(find.byTooltip('Check for updates'));
+    await tester.pumpAndSettle();
+    expect(checks, 2);
+    expect(tester.takeException(), isNull);
+  });
+
+  test('update failures distinguish network, rate limits, and invalid release metadata', () {
+    expect(UpdateController.checkError(const SocketException('offline')), 'checkNetwork');
+    expect(UpdateController.checkError(TimeoutException('timeout')), 'checkNetwork');
+    expect(UpdateController.checkError(const UpdateHttpException(403, true)), 'checkRateLimit');
+    expect(UpdateController.checkError(const UpdateHttpException(404, false)), 'checkService');
+    expect(UpdateController.checkError(const FormatException('manifest')), 'checkMetadata');
   });
 
   test('media diagnostics measure interval delay and discard reset counters', () {

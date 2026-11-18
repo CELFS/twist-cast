@@ -97,6 +97,11 @@
 
 - (id<RTCI420Buffer>)correctRotation:(const id<RTCI420Buffer>)src
                         withRotation:(RTCVideoRotation)rotation {
+  // Unrotated frames already have the required layout; avoid allocating and
+  // copying a full-resolution I420 frame before the pixel-format conversion.
+  if (rotation == RTCVideoRotation_0) {
+    return src;
+  }
   int rotated_width = src.width;
   int rotated_height = src.height;
 

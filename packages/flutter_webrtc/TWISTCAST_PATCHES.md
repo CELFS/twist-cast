@@ -11,3 +11,5 @@ Android screen capture applies the existing 30 fps target through the WebRTC vid
 The application uses this local package so a clean checkout reproduces the same capture behavior without modifying the global package cache.
 
 The iOS integration adds `TwistPlaybackDevice`, supplies the broadcast stream with an audio track, and extends the App Group socket reader to accept 48 kHz mono PCM. The main application's ReplayKit extension is located in `ios/BroadcastExtension`. Socket closure is reported to the application so the session can end. iOS source and project structure have not yet been validated by a full Xcode build or a device broadcast session.
+
+The Apple video renderer reuses the existing I420 buffer when the frame has no rotation, avoiding a redundant full-frame allocation and copy before pixel-format conversion. Rotated frames retain the existing conversion path.
