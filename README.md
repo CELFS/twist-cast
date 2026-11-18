@@ -6,11 +6,11 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.3 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available.
+TwistCast 0.1.4 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available.
 
 ## Platform status
 
-| Platform | Role in 0.1.3 | Implementation |
+| Platform | Role in 0.1.4 | Implementation |
 | --- | --- | --- |
 | Android | Share the full phone screen and internal audio | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the full phone screen and internal audio | ReplayKit broadcast extension and App Group socket |
@@ -21,6 +21,14 @@ TwistCast 0.1.3 is a native Flutter client for one-to-one phone screen sharing o
 This is a development version. Source implementation is not a claim of device certification. Actual capture, rotation, background behavior, audio synchronization, and device-specific permissions still require end-to-end testing. iOS, macOS, Windows, and Linux builds must be checked on their respective operating systems before distributing a release.
 
 Android internal audio requires Android 10 or newer. Apps may prohibit capture of protected video or playback audio; TwistCast does not bypass those restrictions or substitute microphone audio. The iOS broadcast extension ignores microphone samples.
+
+## Updates
+
+Android and macOS check published GitHub Releases when the application opens. The update card shows the installed and latest versions and supports a manual refresh. Same-version workflow artifacts are not offered as updates. Checking and downloading require access to GitHub.
+
+On Android, download progress remains visible in the update card. After downloading, select **Install update** and allow installation from TwistCast when Android asks. The package checksum, application identifier, version code, and signing certificate are verified before the system installer opens. Use release-signed installations for in-place updates.
+
+On macOS, select **Update and restart** and follow the Sparkle update window to download, install, and relaunch. The application sandbox remains enabled, and update archives are verified with the application's public signing key. Stop screen sharing before starting an update.
 
 ## Connect
 
@@ -117,7 +125,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.3`; the build number is `4`.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.4`; the build number is `5`.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -125,7 +133,7 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.3 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
+0.1.4 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
 
 ## License
 

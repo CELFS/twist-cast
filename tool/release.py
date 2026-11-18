@@ -9,10 +9,12 @@
 #   python3 tool/release.py macos-input-key
 #   python3 tool/release.py save-input-times
 #   python3 tool/release.py restore-input-times
+#   python3 tool/release.py appcast
 # Input timestamps are saved with macOS compilation outputs and restored only for identical files.
 # Outputs go to build/release; metadata also writes GitHub Actions job outputs.
 
 import argparse
+import base64
 from datetime import datetime
 import hashlib
 import json
@@ -23,6 +25,7 @@ import re
 import subprocess
 import sys
 import zipfile
+from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / 'build' / 'release'
@@ -158,9 +161,39 @@ def release_policy():
     return {'publish': str(publish).lower(), 'reason': reason}
 
 
+def appcast():
+    values = metadata()
+    version, build_number = values['version'], values['build_number']
+    filename = f'twist-cast-{version}-macos-universal.dmg'
+    archive = OUTPUT / filename
+    signature = subprocess.check_output(
+        ['swift', 'tool/update_signing.swift', 'sign', str(archive)], cwd=ROOT, text=True).strip()
+    if len(base64.b64decode(signature, validate=True)) != 64:
+        raise SystemExit('Invalid macOS update signature.')
+    sparkle = 'http://www.andymatuschak.org/xml-namespaces/sparkle'
+    ElementTree.register_namespace('sparkle', sparkle)
+    rss = ElementTree.Element('rss', version='2.0')
+    channel = ElementTree.SubElement(rss, 'channel')
+    ElementTree.SubElement(channel, 'title').text = 'TwistCast'
+    ElementTree.SubElement(channel, 'link').text = 'https://github.com/CELFS/twist-cast/releases'
+    item = ElementTree.SubElement(channel, 'item')
+    ElementTree.SubElement(item, 'title').text = f'TwistCast {version}'
+    ElementTree.SubElement(item, f'{{{sparkle}}}version').text = build_number
+    ElementTree.SubElement(item, f'{{{sparkle}}}shortVersionString').text = version
+    ElementTree.SubElement(item, f'{{{sparkle}}}minimumSystemVersion').text = '12.0'
+    ElementTree.SubElement(item, 'enclosure', {
+        'url': f'https://github.com/CELFS/twist-cast/releases/download/v{version}/{filename}',
+        'length': str(archive.stat().st_size),
+        'type': 'application/octet-stream',
+        f'{{{sparkle}}}edSignature': signature,
+    })
+    ElementTree.ElementTree(rss).write(OUTPUT / 'appcast.xml', encoding='utf-8', xml_declaration=True)
+    print(OUTPUT / 'appcast.xml')
+
+
 def notices():
     OUTPUT.mkdir(parents=True, exist_ok=True)
-    paths = [ROOT / 'LICENSE', ROOT / 'THIRD_PARTY_NOTICES.md',
+    paths = [ROOT / 'LICENSE', ROOT / 'THIRD_PARTY_NOTICES.md', ROOT / 'docs/licenses/Sparkle.txt',
              ROOT / 'packages/flutter_webrtc/LICENSE',
              ROOT / 'packages/flutter_webrtc/NOTICE',
              ROOT / 'packages/flutter_webrtc/TWISTCAST_PATCHES.md',
@@ -217,7 +250,7 @@ def timings():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['metadata', 'release-policy', 'notices', 'checksums', 'timings',
+    parser.add_argument('command', choices=['metadata', 'release-policy', 'notices', 'checksums', 'timings', 'appcast',
                                           'macos-input-key', 'save-input-times', 'restore-input-times'])
     command = parser.parse_args().command
     if command in ('metadata', 'release-policy'):
@@ -231,6 +264,8 @@ def main():
         notices()
     elif command == 'checksums':
         checksums()
+    elif command == 'appcast':
+        appcast()
     elif command == 'macos-input-key':
         macos_input_key()
     elif command in ('save-input-times', 'restore-input-times'):

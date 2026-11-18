@@ -37,5 +37,19 @@
 	<string>TwistCast connects to devices you approve on your local network.</string>
 	<key>NSBonjourServices</key>
 	<array><string>_twistcast._tcp</string></array>
+	<key>SUFeedURL</key>
+	<string>https://github.com/CELFS/twist-cast/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>$(SPARKLE_PUBLIC_KEY)</string>
+	<key>SUEnableInstallerLauncherService</key>
+	<true/>
+	<key>SUEnableAutomaticChecks</key>
+	<false/>
+	<key>SUAutomaticallyUpdate</key>
+	<false/>
+	<key>SUEnableSystemProfiling</key>
+	<false/>
+	<key>SUVerifyUpdateBeforeExtraction</key>
+	<true/>
 </dict>
 </plist>

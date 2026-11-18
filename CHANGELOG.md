@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.4 - Unreleased
+
+- Check published GitHub Releases from the application and display the installed and latest versions.
+- Download Android updates with progress and verify their checksum, package identity, version code, and signing certificate before opening the system installer.
+- Keep the macOS application sandbox enabled and use Sparkle for signed update downloads, installation, and relaunch.
+- Publish the macOS update feed alongside release packages and keep same-version workflow artifacts outside the update channel.
+
 ## 0.1.3 - Unreleased
 
 - Replace the default Flutter application icons on Android, iOS, macOS, and Windows with the TwistCast landscape-and-portrait screen mark.

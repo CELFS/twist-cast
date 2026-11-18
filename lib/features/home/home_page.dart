@@ -6,6 +6,8 @@ import '../../l10n/generated/app_localizations.dart';
 import '../cast/cast_controller.dart';
 import '../pairing/pairing_card.dart';
 import '../pairing/scanner_page.dart';
+import '../updates/update_card.dart';
+import '../updates/update_controller.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({required this.locale, required this.onLocaleChanged, super.key});
@@ -18,12 +20,13 @@ class HomePage extends StatefulWidget {
 class _HomePageState extends State<HomePage> {
   final _cast = CastController();
   bool _scanning = false;
+  bool _installingUpdate = false;
 
   @override
   void dispose() { _cast.dispose(); super.dispose(); }
 
   Future<void> _scan() async {
-    if (_scanning) return;
+    if (_scanning || _installingUpdate) return;
     _scanning = true;
     await _cast.stop();
     if (!mounted) return;
@@ -73,9 +76,9 @@ class _HomePageState extends State<HomePage> {
                     if (_cast.isMobile) ...[
                       FilledButton.icon(onPressed: _scan, icon: const Icon(Icons.qr_code_scanner), label: Text(text.scanQr)),
                       const SizedBox(height: 12),
-                      OutlinedButton.icon(onPressed: _cast.search, icon: const Icon(Icons.search), label: Text(text.findDevices)),
+                      OutlinedButton.icon(onPressed: _installingUpdate ? null : _cast.search, icon: const Icon(Icons.search), label: Text(text.findDevices)),
                     ] else
-                      FilledButton.icon(onPressed: _cast.receive, icon: const Icon(Icons.cast), label: Text(text.startReceiving)),
+                      FilledButton.icon(onPressed: _installingUpdate ? null : _cast.receive, icon: const Icon(Icons.cast), label: Text(text.startReceiving)),
                   ],
                 ))),
               ],
@@ -133,6 +136,12 @@ class _HomePageState extends State<HomePage> {
                 OutlinedButton.icon(onPressed: _cast.stop, icon: const Icon(Icons.stop_circle_outlined), label: Text(text.stop)),
               ],
               const SizedBox(height: 24),
+              if (UpdateController.supported) ...[
+                UpdateCard(sessionActive: active, onInstallingChanged: (value) {
+                  if (mounted) setState(() => _installingUpdate = value);
+                }),
+                const SizedBox(height: 16),
+              ],
               Text(text.versionLabel, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
             ]),
           ),

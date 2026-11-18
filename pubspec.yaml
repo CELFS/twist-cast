@@ -1,7 +1,7 @@
 name: twist_cast
 description: "Private screen sharing across your devices."
 publish_to: 'none'
-version: 0.1.3+4
+version: 0.1.4+5
 
 environment:
   sdk: ^3.14.0

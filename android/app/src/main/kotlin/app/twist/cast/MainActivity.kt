@@ -15,9 +15,13 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : FlutterActivity() {
     private var audioPermission: MethodChannel.Result? = null
     private var events: EventChannel.EventSink? = null
+    private var updates: AppUpdates? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        updates = AppUpdates(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/updates")
+            .setMethodCallHandler(updates)
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/capture-events")
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, sink: EventChannel.EventSink) { events = sink }
@@ -65,6 +69,13 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/updates").setMethodCallHandler(null)
+        updates?.dispose()
+        updates = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

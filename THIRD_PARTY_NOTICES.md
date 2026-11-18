@@ -35,6 +35,10 @@ The following legal documents were retrieved unchanged from their upstream sourc
 | [third_party/licenses/webrtc/AUTHORS](packages/flutter_webrtc/third_party/licenses/webrtc/AUTHORS) | [Upstream text](https://raw.githubusercontent.com/webrtc-sdk/webrtc/4de68c8241d1c04d866aa1efd64f0be71317ad79/AUTHORS) | `0d111130ece163ae3d65918344ebdbdba5072135c0447eed1d71804753e1b9cd` |
 | [third_party/licenses/apache/LICENSE-2.0.txt](packages/flutter_webrtc/third_party/licenses/apache/LICENSE-2.0.txt) | [Upstream text](https://www.apache.org/licenses/LICENSE-2.0.txt) | `cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30` |
 
+## macOS update framework
+
+macOS builds include Sparkle 2.10.1 for update installation. Retain its [license and bundled component notices](docs/licenses/Sparkle.txt) with binary distributions. Sparkle is obtained through Swift Package Manager; its source is not vendored in this repository.
+
 ## Distribution scope
 
 This index covers the third-party source copied into `packages/flutter_webrtc`. Keep it, the linked license files, the upstream NOTICE, and the applicable source copyright headers with source distributions.

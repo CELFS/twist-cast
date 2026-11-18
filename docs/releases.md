@@ -1,6 +1,6 @@
 # Release builds
 
-TwistCast 0.1.3 uses Flutter 3.50.0 and Dart 3.14.0. The application version is `0.1.3`; its internal build number is `4`. `pubspec.yaml` stores these as `0.1.3+4`.
+TwistCast 0.1.4 uses Flutter 3.50.0 and Dart 3.14.0. The application version is `0.1.4`; its internal build number is `5`. `pubspec.yaml` stores these as `0.1.4+5`.
 
 ## Direct links
 
@@ -26,6 +26,22 @@ Create these four repository secrets using the direct links below. Each local fi
 | `ANDROID_KEY_PASSWORD` | `.secrets/ANDROID_KEY_PASSWORD.txt` | `pbcopy < .secrets/ANDROID_KEY_PASSWORD.txt` | [New repository secret](https://github.com/CELFS/twist-cast/settings/secrets/actions/new) |
 
 Enter the name in **Name**, paste the matching value into **Secret**, and select **Add secret** for each entry. The workflow fails with a clear error if signing secrets are missing; it never falls back to a debug key. Secret values are supplied only to the Android job, and its temporary keystore is removed when the job finishes.
+
+## macOS update signing
+
+Sparkle 2.10.1 is pinned in the macOS Xcode project. Swift Package Manager resolves it during the macOS build. The application retains App Sandbox and enables Sparkle's installer service. Updates use the `appcast.xml` asset from the latest published GitHub Release; same-version workflow artifacts do not enter this channel.
+
+The public verification key is stored in `macos/Runner/Configs/Updates.xcconfig`. Its matching private key is stored locally in the ignored `.secrets/SPARKLE_PRIVATE_KEY.txt` file. Back up this private key securely; do not regenerate or replace it for routine releases.
+
+Configure the `SPARKLE_PRIVATE_KEY` [repository secret](https://github.com/CELFS/twist-cast/settings/secrets/actions/new) using the contents of that file. With GitHub CLI, run from the repository root:
+
+```bash
+gh secret set SPARKLE_PRIVATE_KEY --repo CELFS/twist-cast < .secrets/SPARKLE_PRIVATE_KEY.txt
+```
+
+The macOS job verifies the secret against the committed public key before compiling. After packaging, `python3 tool/release.py appcast` signs the DMG with Ed25519 and writes its version, build number, size, download URL, and signature into the feed. The release is published only after the complete package set and feed are uploaded. A missing or mismatched key fails the job instead of publishing an unsigned update.
+
+`swift tool/update_signing.swift init` is only for the initial setup of a new signing identity; it refuses to overwrite existing key files. Existing installations trust the embedded public key, so key rotation requires a separate migration.
 
 ## Build and publish
 
@@ -71,10 +87,10 @@ First builds still download large SDKs. Cache reuse and parallel builds reduce r
 
 | Asset | Use |
 | --- | --- |
-| `twist-cast-0.1.3-android-arm64-v8a.apk` | Most current Android phones, including current Redmi devices |
-| `twist-cast-0.1.3-android-armeabi-v7a.apk` | Older 32-bit ARM Android devices |
-| `twist-cast-0.1.3-android-x86_64.apk` | x86_64 Android devices and compatible emulators |
-| `twist-cast-0.1.3-macos-universal.dmg` | Apple Silicon and Intel Macs, macOS 12 or newer |
+| `twist-cast-0.1.4-android-arm64-v8a.apk` | Most current Android phones, including current Redmi devices |
+| `twist-cast-0.1.4-android-armeabi-v7a.apk` | Older 32-bit ARM Android devices |
+| `twist-cast-0.1.4-android-x86_64.apk` | x86_64 Android devices and compatible emulators |
+| `twist-cast-0.1.4-macos-universal.dmg` | Apple Silicon and Intel Macs, macOS 12 or newer |
 | `THIRD_PARTY_NOTICES.zip` | Vendored source notices and Flutter-generated Android package notices |
 | `SHA256SUMS.txt` | SHA-256 checksums of the release assets |
 
@@ -106,4 +122,4 @@ The APKs are written to `build/app/outputs/flutter-apk/`. Release builds without
 
 Update `pubspec.yaml` with the next application version and a strictly larger build number. Update the displayed version in both ARB files, the broadcast extension's version/build number, and the version references in the documentation. Keep using the same Android signing key.
 
-Run `python3 tool/release.py metadata` to verify the version fields. The release tag must match the application version, for example `v0.1.3`, without the internal build-number suffix.
+Run `python3 tool/release.py metadata` to verify the version fields. The release tag must match the application version, for example `v0.1.4`, without the internal build-number suffix.

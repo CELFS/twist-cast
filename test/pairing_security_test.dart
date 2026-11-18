@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:twist_cast/app.dart';
@@ -15,6 +16,10 @@ void main() {
   HttpOverrides.global = null;
 
   testWidgets('desktop starts offline, fits a compact window and switches language', (tester) async {
+    const updates = MethodChannel('app.twist.cast/updates');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(updates, (_) async => throw PlatformException(code: 'offline'));
+    addTearDown(() => messenger.setMockMethodCallHandler(updates, null));
     tester.view.physicalSize = const Size(800, 600);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
@@ -24,6 +29,9 @@ void main() {
     expect(find.text('Connected · encrypted screen sharing'), findsNothing);
     await tester.tap(find.byType(DropdownButton<Locale>));
     await tester.pumpAndSettle();
+    if (Platform.isMacOS || Platform.isAndroid) {
+      expect(find.text('Could not check for updates. Check your connection to GitHub and try again.'), findsOneWidget);
+    }
     await tester.tap(find.text('简体中文').last);
     await tester.pumpAndSettle();
     expect(find.text('开始接收'), findsOneWidget);
