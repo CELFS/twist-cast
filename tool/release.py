@@ -2,6 +2,9 @@
 # Release metadata and packaging helpers (Python 3, standard library only).
 # Usage from the repository root:
 #   python3 tool/release.py metadata
+#   python3 tool/release.py check-inputs
+#   python3 tool/release.py preflight
+# Preflight uses the installed Flutter SDK and existing dependencies; it does not install them.
 #   PUBLISH_REQUESTED=true python3 tool/release.py release-policy
 #   python3 tool/release.py notices
 #   python3 tool/release.py checksums
@@ -40,9 +43,10 @@ def tracked_inputs():
 
 def macos_input_key():
     digest = hashlib.sha256()
+    # Workflow and packaging helpers do not change compiled application inputs.
     for path in sorted(tracked_inputs()):
         name = path.relative_to(ROOT).as_posix()
-        if not (name.startswith(('lib/', 'macos/', 'packages/', 'assets/', '.github/', 'tool/')) or
+        if not (name.startswith(('lib/', 'macos/', 'packages/', 'assets/')) or
                 name in ('pubspec.yaml', 'pubspec.lock', 'l10n.yaml')):
             continue
         digest.update(name.encode() + b'\0' + hashlib.sha256(path.read_bytes()).digest())
@@ -118,6 +122,32 @@ def metadata():
         'android_matrix': json.dumps({'include': android}, separators=(',', ':')),
         'notices_abi': android[0]['abi'] if android else '',
     }
+
+
+def check_inputs():
+    values = metadata()
+    for directory in ('macos', 'ios'):
+        for pattern in ('**/Info.plist', '**/*.entitlements'):
+            for path in (ROOT / directory).glob(pattern):
+                if 'ephemeral' in path.parts or 'Pods' in path.parts or path.is_symlink():
+                    continue
+                with path.open('rb') as stream:
+                    plistlib.load(stream)
+    config = (ROOT / 'macos/Runner/Configs/Updates.xcconfig').read_text()
+    match = re.search(r'^SPARKLE_PUBLIC_KEY\s*=\s*(\S+)', config, re.MULTILINE)
+    if not match or len(base64.b64decode(match.group(1), validate=True)) != 32:
+        raise SystemExit('Expected a 32-byte Sparkle public verification key.')
+    print(f'Release inputs are valid for {values["tag"]}.')
+
+
+def preflight():
+    check_inputs()
+    if sys.platform == 'darwin':
+        subprocess.run(['plutil', '-lint', 'macos/Runner.xcodeproj/project.pbxproj'],
+                       cwd=ROOT, check=True)
+    for command in (['flutter', 'analyze', '--no-pub'], ['flutter', 'test', '--no-pub']):
+        subprocess.run(command, cwd=ROOT, check=True)
+    print('Preflight passed. Native package compilation and device testing are still required.')
 
 
 def github_resource(path):
@@ -237,6 +267,12 @@ def timings():
     for job in payload['jobs']:
         if job['name'] == 'timings':
             continue
+        created, started = job.get('created_at'), job.get('started_at')
+        if created and started:
+            seconds = max(0, int((datetime.fromisoformat(started.replace('Z', '+00:00')) -
+                                 datetime.fromisoformat(created.replace('Z', '+00:00'))).total_seconds()))
+            label = job['name'].replace('|', r'\|').replace('\n', ' ')
+            print(f'| {label} — wait before start | | {seconds // 60}m {seconds % 60}s |')
         for item in [job, *job.get('steps', [])]:
             start, end = item.get('started_at'), item.get('completed_at')
             if not start or not end:
@@ -254,7 +290,8 @@ def timings():
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['metadata', 'release-policy', 'notices', 'checksums', 'timings', 'appcast',
-                                          'macos-input-key', 'save-input-times', 'restore-input-times'])
+                                          'macos-input-key', 'save-input-times', 'restore-input-times',
+                                          'check-inputs', 'preflight'])
     command = parser.parse_args().command
     if command in ('metadata', 'release-policy'):
         values = metadata() if command == 'metadata' else release_policy()
@@ -263,6 +300,10 @@ def main():
             with open(output, 'a') as stream:
                 stream.writelines(f'{key}={value}\n' for key, value in values.items())
         print(json.dumps(values))
+    elif command == 'check-inputs':
+        check_inputs()
+    elif command == 'preflight':
+        preflight()
     elif command == 'notices':
         notices()
     elif command == 'checksums':

@@ -45,6 +45,14 @@ The macOS job verifies the secret against the committed public key before compil
 
 ## Build and publish
 
+Before submitting a release, use the installed Flutter SDK and already resolved dependencies to run:
+
+```sh
+python3 tool/release.py preflight
+```
+
+This validates version fields, property lists, entitlements, and the public update key, then runs analysis and tests without fetching packages. On macOS it also checks Xcode project syntax. It does not install tools or dependencies, build native packages, or verify private signing secrets. A full macOS build still requires Xcode. The workflow runs the release input checks before starting platform jobs and repeats the preflight checks in its checks job.
+
 Push commits to `main` using your normal Git workflow. This automatically runs the complete release workflow; no manual **Run workflow** action is needed. Every successful platform build uploads packages to that run's Artifacts. After all checks and builds succeed, an unpublished version is published to GitHub Releases using the tag derived from `pubspec.yaml`, created at the selected commit if needed. If that version is already published, the build still runs and the new packages remain in Artifacts only.
 
 Manual runs remain available from the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml). Choose a branch and **target** to run the full workflow or rebuild selected packages. Pushing a matching version tag also remains supported. Avoid manually starting or pushing a tag for the same commit while its `main` push run is already processing.
@@ -77,9 +85,9 @@ For a newly published version, open [Releases](https://github.com/CELFS/twist-ca
 - A separate job primes the shared Android NDK, CMake, platform, and build-tools cache. Its warm-cache path only checks availability; the architecture jobs restore the cache directly. Versions live in `.github/android-toolchain.json`; the NDK and Android platform versions are checked against the pinned Flutter SDK.
 - Before Android cache extraction, existing toolchain directories are made writable by the runner so preinstalled SDK files do not cause archive restoration to fail.
 - Gradle uses its minimal binary distribution with an official SHA-256 checksum. `setup-gradle` restores dependencies and task outputs for each matrix job. Build caching, parallel tasks, four-worker limits, and daemon shutdown are enabled only in CI; configuration caching of signing credentials is not enabled.
-- Android Flutter compilation outputs are cached separately for each architecture. macOS caches Swift packages at Flutter's actual `build/macos/SourcePackages` path and reuses native compilation outputs keyed by Xcode, Flutter, dependencies, and build inputs. Native outputs are saved after a successful compilation and before packaging checks.
-- macOS compilation caches include an input timestamp manifest. After checkout, timestamps are restored only when file content matches the successful cached build, allowing unchanged native sources to retain incremental compilation state. Changed inputs keep their new timestamps. Documentation-only commits reuse the same native cache key; compilation and package verification still run.
-- Open each job's summary for cache hits. The final **timings** job reports the duration of every job and step, including cache transfers. Compare cold and warm runs separately; cache transfer and parallel-job overhead must be included when evaluating improvements.
+- Android Flutter compilation outputs are cached separately for each architecture. macOS caches Swift packages at Flutter's actual `build/macos/SourcePackages` path and reuses native compilation outputs keyed by Xcode, Flutter, dependencies, and build inputs. Native outputs are saved after a successful compilation and before packaging checks. Swift package downloads can be restored from the latest cache for the same architecture and Xcode build when the exact dependency key changes; SwiftPM still resolves and validates the current dependency graph. Native compilation outputs retain their stricter dependency and project compatibility key.
+- macOS compilation caches include an input timestamp manifest. After checkout, timestamps are restored only when file content matches the successful cached build, allowing unchanged native sources to retain incremental compilation state. Changed inputs keep their new timestamps. Documentation-only, workflow-only, and packaging-helper-only commits reuse the same native cache key; compilation and package verification still run.
+- Open each job's summary for cache hits. The final **timings** job reports the duration of every job and step, including cache transfers, and reports the interval between job creation and start separately. This waiting interval can include scheduling and prerequisite waits; it is not compilation time. Compare cold and warm runs separately; cache transfer and parallel-job overhead must be included when evaluating improvements.
 
 First builds still download large SDKs. Cache reuse and parallel builds reduce repeated work, but their actual effect must be measured in cloud runs; no fixed completion time is guaranteed. Compilation runs on GitHub-hosted machines and does not require local builds.
 

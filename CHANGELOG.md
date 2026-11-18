@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Reuse downloaded Swift packages across project configuration changes within the same Xcode toolchain, while retaining native compilation cache compatibility checks.
+- Avoid new macOS compilation cache entries for workflow-only and packaging-helper changes.
+- Validate release inputs before starting platform builds, provide a local preflight command, and report job waiting time separately from execution time.
+
 - Enable low-delay video playout on macOS receivers and log interval encoding, sending, decoding, buffering, and network timing metrics for latency diagnosis.
 
 - Enforce the Android screen video source frame rate before encoding and allow resolution adaptation to preserve motion under load.
