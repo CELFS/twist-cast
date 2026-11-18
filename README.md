@@ -115,6 +115,8 @@ macos/, windows/, linux/ Desktop runners
 
 The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.1`; the build number is `2`.
 
+Record changes in [CHANGELOG.md](CHANGELOG.md).
+
 The root `temp/` directory is ignored by Git and reserved for local documents. It is not needed to build or run the application.
 
 ## Scope
