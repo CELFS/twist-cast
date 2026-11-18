@@ -3,7 +3,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../cast/cast_controller.dart';
-import '../cast/receiver_view.dart';
+import '../cast/receiver_page.dart';
 import '../pairing/pairing_card.dart';
 import '../pairing/scanner_page.dart';
 import '../updates/update_card.dart';
@@ -48,8 +48,7 @@ class _HomePageState extends State<HomePage> {
     return ListenableBuilder(listenable: _cast, builder: (context, _) {
       final active = ![CastPhase.idle, CastPhase.ended, CastPhase.failed].contains(_cast.phase);
       final viewing = _cast.phase == CastPhase.casting && !_cast.sending && _cast.media != null;
-      return Scaffold(
-        appBar: AppBar(title: const AppBrand(), centerTitle: false, titleSpacing: 16, actions: [
+      final header = AppBar(title: const AppBrand(), centerTitle: false, titleSpacing: 16, actions: [
           Padding(padding: const EdgeInsets.only(right: 16), child: DropdownButton<Locale>(
             value: widget.locale, underline: const SizedBox.shrink(),
             items: [
@@ -58,11 +57,15 @@ class _HomePageState extends State<HomePage> {
             ],
             onChanged: (value) { if (value != null) widget.onLocaleChanged(value); },
           )),
-        ]),
+        ]);
+      if (viewing) {
+        return ReceiverPage(renderer: _cast.media!.renderer,
+          onStop: _cast.stop, header: header);
+      }
+      return Scaffold(
+        appBar: header,
         bottomNavigationBar: const AppFooter(),
-        body: SafeArea(bottom: false, child: viewing
-          ? ReceiverView(renderer: _cast.media!.renderer, onStop: _cast.stop)
-          : Center(child: SingleChildScrollView(
+        body: SafeArea(bottom: false, child: Center(child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 960),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [

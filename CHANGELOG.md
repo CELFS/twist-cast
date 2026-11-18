@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Enforce the Android screen video source frame rate before encoding and allow resolution adaptation to preserve motion under load.
+- Preserve the correct capture dimensions when screen sharing starts in landscape orientation.
+
+- Add rounded corners and transparent padding to macOS application icons while preserving the original artwork.
+- Hide the receiver title and language selector by default and provide a control to show or hide them during a session.
+- Hide the footer during screen reception and refit the receiver window when the header visibility changes.
+
 ## 0.1.5 - Unreleased
 
 - Fit desktop receiver windows to the shared screen aspect ratio, including orientation changes.

@@ -572,6 +572,9 @@ public class GetUserMediaImpl {
         info.width = size.x;
         info.height = size.y;
         info.fps = DEFAULT_FPS;
+        // ScreenCapturer ignores its FPS argument. Drop excess frames at the source
+        // before encoding; use the screen dimensions to preserve its aspect ratio.
+        videoSource.adaptOutputFormat(info.width, info.height, info.fps);
         info.isScreenCapture = true;
         info.capturer = videoCapturer;
 

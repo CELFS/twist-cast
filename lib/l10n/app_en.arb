@@ -64,5 +64,7 @@
   "updateInstallFailed": "Could not install the update. Check installation permissions and try again.",
   "updateStopSession": "Stop screen sharing before updating.",
   "footerLabel": "© · 2026 · CELFS · v0.1.5",
-  "resizeWindowFailed": "Could not resize the window automatically."
+  "resizeWindowFailed": "Could not resize the window automatically.",
+  "showHeader": "Show title and language",
+  "hideHeader": "Hide title and language"
 }

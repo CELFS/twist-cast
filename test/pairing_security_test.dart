@@ -5,7 +5,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:twist_cast/features/cast/receiver_view.dart';
+import 'package:twist_cast/features/cast/receiver_page.dart';
 import 'package:twist_cast/features/home/app_brand.dart';
 import 'package:twist_cast/features/home/app_footer.dart';
 import 'package:twist_cast/l10n/generated/app_localizations.dart';
@@ -62,23 +62,37 @@ void main() {
     await tester.pumpWidget(MaterialApp(
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
-      home: Scaffold(appBar: AppBar(title: const AppBrand()),
-        bottomNavigationBar: const AppFooter(),
-        body: ReceiverView(renderer: renderer, onStop: () { stopped = true; })),
+      home: ReceiverPage(renderer: renderer, onStop: () { stopped = true; },
+        header: AppBar(title: const AppBrand())),
     ));
     await tester.pump(const Duration(milliseconds: 200));
     expect(calls, hasLength(1));
     expect(calls.single.arguments['aspectRatio'], closeTo(0.45, 0.001));
-    expect(calls.single.arguments['chromeHeight'], 140);
+    expect(calls.single.arguments['chromeHeight'], 48);
+    expect(find.byType(AppBrand), findsNothing);
+    expect(find.byType(AppFooter), findsNothing);
+    await tester.tap(find.byTooltip('Show title and language'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(calls, hasLength(2));
+    expect(calls.last.arguments['chromeHeight'], 104);
+    expect(find.byType(AppBrand), findsOneWidget);
+    expect(find.byType(AppFooter), findsNothing);
+    await tester.tap(find.byTooltip('Hide title and language'));
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+    expect(calls, hasLength(3));
+    expect(calls.last.arguments['chromeHeight'], 48);
+    expect(find.byType(AppBrand), findsNothing);
     expect(tester.getBottomRight(find.text('Stop')).dy,
       lessThan(tester.getTopLeft(find.byType(RTCVideoView)).dy));
     renderer.value = renderer.value.copyWith(rotation: 90);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
-    expect(calls, hasLength(2));
+    expect(calls, hasLength(4));
     expect(calls.last.arguments['aspectRatio'], closeTo(2400 / 1080, 0.001));
     await tester.pump(const Duration(milliseconds: 200));
-    expect(calls, hasLength(2));
+    expect(calls, hasLength(4));
     await tester.tap(find.byType(OutlinedButton));
     expect(stopped, isTrue);
     expect(tester.takeException(), isNull);

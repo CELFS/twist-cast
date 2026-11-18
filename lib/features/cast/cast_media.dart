@@ -80,7 +80,17 @@ class CastMedia {
     _stream = stream;
     for (final track in stream.getVideoTracks()) { track.onEnded = onStopped; }
     await setAudio(audio);
-    for (final track in stream.getTracks()) { await _peer!.addTrack(track, stream); }
+    for (final track in stream.getTracks()) {
+      final sender = await _peer!.addTrack(track, stream);
+      if (Platform.isAndroid && track.kind == 'video') {
+        // Adapt resolution under encoder pressure instead of sacrificing motion.
+        final parameters = sender.parameters;
+        parameters.degradationPreference = RTCDegradationPreference.MAINTAIN_FRAMERATE;
+        if (!await sender.setParameters(parameters)) {
+          throw StateError('Could not configure screen video adaptation');
+        }
+      }
+    }
     final offer = await _peer!.createOffer();
     await _peer!.setLocalDescription(offer);
     if (!_closed) send({'type': 'offer', 'sdp': offer.sdp});

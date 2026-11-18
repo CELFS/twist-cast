@@ -118,13 +118,11 @@ public class OrientationAwareScreenCapturer implements VideoCapturer, VideoSink 
         //checkNotDisposed();
 
         this.isPortrait = isDeviceOrientationPortrait();
-        if (this.isPortrait) {
-            this.width = width;
-            this.height = height;
-        } else {
-            this.height = width;
-            this.width = height;
-        }
+        // Display metrics may already be landscape when sharing starts.
+        final int shortSide = Math.min(width, height);
+        final int longSide = Math.max(width, height);
+        this.width = this.isPortrait ? shortSide : longSide;
+        this.height = this.isPortrait ? longSide : shortSide;
         this.oldWidth = this.width;
         this.oldHeight = this.height;
 
