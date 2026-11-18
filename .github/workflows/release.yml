@@ -1,0 +1,213 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  FLUTTER_VERSION: '3.50.0'
+  FLUTTER_SUPPRESS_ANALYTICS: 'true'
+
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - id: version
+        run: python3 tool/release.py metadata
+      - name: Check any existing release tag points to this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha 2>/dev/null); then
+            test "$commit" = "$GITHUB_SHA" || { echo 'The version tag already points to another commit.'; exit 1; }
+          fi
+
+  checks:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter gen-l10n
+      - run: flutter analyze --no-pub
+      - run: flutter test --no-pub
+
+  android:
+    needs: metadata
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    env:
+      TWISTCAST_KEYSTORE_PATH: ${{ github.workspace }}/.secrets/twist-cast-release.jks
+      TWISTCAST_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+      TWISTCAST_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      TWISTCAST_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Restore the dedicated release signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          python3 - <<'PY'
+          import base64, os
+          from pathlib import Path
+          required = ['ANDROID_KEYSTORE_BASE64', 'TWISTCAST_STORE_PASSWORD',
+                      'TWISTCAST_KEY_ALIAS', 'TWISTCAST_KEY_PASSWORD']
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              raise SystemExit('Missing signing secrets: ' + ', '.join(missing) + '. See docs/releases.md.')
+          path = Path(os.environ['TWISTCAST_KEYSTORE_PATH'])
+          path.parent.mkdir(mode=0o700, exist_ok=True)
+          path.write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'].strip(), validate=True))
+          path.chmod(0o600)
+          PY
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+          cache-dependency-path: |
+            android/**/*.gradle.kts
+            android/gradle/wrapper/gradle-wrapper.properties
+            packages/flutter_webrtc/android/build.gradle
+            pubspec.lock
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter gen-l10n
+      - run: flutter build apk --release --split-per-abi --no-pub
+      - name: Collect Android packages and notices
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          mkdir -p build/release
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            cp "build/app/outputs/flutter-apk/app-$abi-release.apk" "build/release/twist-cast-$VERSION-android-$abi.apk"
+          done
+          python3 tool/release.py notices
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: android-release
+          path: build/release/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+      - name: Remove the signing key
+        if: always()
+        run: rm -f "$TWISTCAST_KEYSTORE_PATH"
+
+  macos:
+    needs: metadata
+    runs-on: macos-15
+    timeout-minutes: 40
+    env:
+      FLUTTER_MACOS_ARM64_ONLY: 'false'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            ~/Library/Developer/Xcode/DerivedData/*/SourcePackages
+          key: macos-spm-${{ runner.arch }}-${{ hashFiles('pubspec.lock', '**/Package.swift', '**/Package.resolved') }}
+      - run: flutter pub get --enforce-lockfile
+      - run: flutter gen-l10n
+      - run: flutter build macos --release --no-pub
+      - name: Verify and package the universal macOS application
+        env:
+          VERSION: ${{ needs.metadata.outputs.version }}
+        run: |
+          app=build/macos/Build/Products/Release/TwistCast.app
+          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/TwistCast"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
+          mkdir -p build/dmg build/release
+          ditto "$app" build/dmg/TwistCast.app
+          ln -s /Applications build/dmg/Applications
+          python3 tool/release.py notices
+          unzip -q build/release/THIRD_PARTY_NOTICES.zip -d build/dmg/Licenses
+          rm build/release/THIRD_PARTY_NOTICES.zip
+          hdiutil create -volname TwistCast -srcfolder build/dmg -ov -format UDZO "build/release/twist-cast-$VERSION-macos-universal.dmg"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: macos-release
+          path: build/release/*.dmg
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+  publish:
+    needs: [metadata, checks, android, macos]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ needs.metadata.outputs.tag }}
+      VERSION: ${{ needs.metadata.outputs.version }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          pattern: '*-release'
+          path: build/release
+          merge-multiple: true
+      - run: python3 tool/release.py checksums
+      - name: Publish the complete release
+        run: |
+          cat > build/release-notes.md <<'NOTES'
+          Native one-to-one phone screen sharing over a local network, with encrypted pairing and optional internal audio.
+
+          - Android phones: download `android-arm64-v8a.apk` for most current phones. ARMv7 and x86_64 packages are also provided.
+          - macOS: download `macos-universal.dmg` and drag TwistCast to Applications. Supports Apple Silicon and Intel Macs. This build is ad-hoc signed and is not notarized; macOS may require approval in System Settings > Privacy & Security.
+          - Android release packages use a dedicated signing key. An existing debug-signed installation must be uninstalled first; uninstalling removes its local pairing data. Later releases retain the same release key for in-place updates.
+          - These are early testing builds. Real-device capture, internal audio, and cross-device operation still need verification.
+          - Checksums and third-party notices are included. iOS, Windows, and Linux packages are not included in this release workflow.
+          NOTES
+          if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
+            test "$draft" = true || { echo 'Refusing to overwrite a published release.'; exit 1; }
+            commit=$(gh api "repos/$GITHUB_REPOSITORY/commits/$TAG" --jq .sha)
+            test "$commit" = "$GITHUB_SHA" || { echo 'The release tag points to another commit.'; exit 1; }
+          else
+            gh release create "$TAG" --target "$GITHUB_SHA" --draft --title "TwistCast $VERSION" --notes-file build/release-notes.md
+          fi
+          gh release upload "$TAG" build/release/* --clobber
+          gh release edit "$TAG" --draft=false --notes-file build/release-notes.md

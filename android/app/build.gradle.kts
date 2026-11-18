@@ -4,6 +4,27 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+val releaseSigning = mapOf(
+    "storeFile" to System.getenv("TWISTCAST_KEYSTORE_PATH"),
+    "storePassword" to System.getenv("TWISTCAST_STORE_PASSWORD"),
+    "keyAlias" to System.getenv("TWISTCAST_KEY_ALIAS"),
+    "keyPassword" to System.getenv("TWISTCAST_KEY_PASSWORD"),
+)
+val hasReleaseSigning = releaseSigning.values.all { !it.isNullOrBlank() }
+
+// Refuse unsigned release artifacts; debug builds do not require a release key.
+val validateReleaseSigning by tasks.registering {
+    doLast {
+        check(hasReleaseSigning) { "Release signing is missing. See docs/releases.md." }
+        check(file(releaseSigning.getValue("storeFile")!!).isFile) {
+            "The configured release keystore does not exist. See docs/releases.md."
+        }
+    }
+}
+tasks.matching { it.name == "preReleaseBuild" }.configureEach {
+    dependsOn(validateReleaseSigning)
+}
+
 android {
     namespace = "app.twist.cast"
     compileSdk = flutter.compileSdkVersion
@@ -29,11 +50,20 @@ android {
         versionName = flutter.versionName
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseSigning.getValue("storeFile")!!)
+                storePassword = releaseSigning.getValue("storePassword")
+                keyAlias = releaseSigning.getValue("keyAlias")
+                keyPassword = releaseSigning.getValue("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = if (hasReleaseSigning) signingConfigs.getByName("release") else null
         }
     }
 }

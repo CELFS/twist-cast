@@ -1,0 +1,84 @@
+# Release builds
+
+TwistCast 0.1.1 uses Flutter 3.50.0 and Dart 3.14.0. The application version is `0.1.1`; its internal build number is `2`. `pubspec.yaml` stores these as `0.1.1+2`.
+
+## Direct links
+
+- [Download published packages](https://github.com/CELFS/twist-cast/releases)
+- [Run or inspect the Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml)
+- [Repository Actions secrets](https://github.com/CELFS/twist-cast/settings/secrets/actions)
+- [Add a repository secret](https://github.com/CELFS/twist-cast/settings/secrets/actions/new)
+- [Repository Actions permissions](https://github.com/CELFS/twist-cast/settings/actions)
+
+Settings pages require repository administration access. The workflow page becomes available after `.github/workflows/release.yml` is pushed to the default branch.
+
+## One-time Android signing setup
+
+Android releases use a dedicated TwistCast signing key. Keep the same key for every update. The keystore, passwords, and local environment file are stored in `.secrets/`, which is ignored by Git. Back up this directory securely outside the repository; losing the key prevents updates to existing installations. Do not attach these files to a release or share their contents publicly.
+
+Create these four repository secrets using the direct links below. Each local file contains exactly one secret value. The copy commands are for macOS and must be run from the TwistCast repository root; they put the value on the clipboard without printing it.
+
+| Secret name | Local value file | Copy command | GitHub entry |
+| --- | --- | --- | --- |
+| `ANDROID_KEYSTORE_BASE64` | `.secrets/ANDROID_KEYSTORE_BASE64.txt` | `pbcopy < .secrets/ANDROID_KEYSTORE_BASE64.txt` | [New repository secret](https://github.com/CELFS/twist-cast/settings/secrets/actions/new) |
+| `ANDROID_STORE_PASSWORD` | `.secrets/ANDROID_STORE_PASSWORD.txt` | `pbcopy < .secrets/ANDROID_STORE_PASSWORD.txt` | [New repository secret](https://github.com/CELFS/twist-cast/settings/secrets/actions/new) |
+| `ANDROID_KEY_ALIAS` | `.secrets/ANDROID_KEY_ALIAS.txt` | `pbcopy < .secrets/ANDROID_KEY_ALIAS.txt` | [New repository secret](https://github.com/CELFS/twist-cast/settings/secrets/actions/new) |
+| `ANDROID_KEY_PASSWORD` | `.secrets/ANDROID_KEY_PASSWORD.txt` | `pbcopy < .secrets/ANDROID_KEY_PASSWORD.txt` | [New repository secret](https://github.com/CELFS/twist-cast/settings/secrets/actions/new) |
+
+Enter the name in **Name**, paste the matching value into **Secret**, and select **Add secret** for each entry. The workflow fails with a clear error if signing secrets are missing; it never falls back to a debug key. Secret values are supplied only to the Android job, and its temporary keystore is removed when the job finishes.
+
+## Build and publish
+
+Commit and push the release configuration using your normal Git workflow. Then either:
+
+1. Open [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml), select **Run workflow**, choose the branch containing the release, and run it. The workflow derives the tag from `pubspec.yaml`, creates that tag at the selected commit when publishing, and publishes the release after all checks and builds succeed.
+2. Push the matching version tag, such as `v0.1.1`. This starts the same workflow automatically.
+
+Do not start both methods for the same version. Manual dispatch requires the workflow to be present on the default branch. An existing version tag must identify the selected commit. Published releases are never overwritten; publish a new version for changed packages. A failed draft upload can be retried for the same tag and commit.
+
+The workflow validates version consistency, then runs analysis/tests, Android builds, and the macOS build in parallel. It caches Flutter, Dart packages, Gradle dependencies, and Swift package downloads. First builds still download large SDKs; cache reuse reduces repeated work but does not guarantee a fixed completion time.
+
+Only the publish job receives repository write permission. It uploads all packages and checksums to a draft before publishing. If organization or repository policy blocks this permission, review [Actions permissions](https://github.com/CELFS/twist-cast/settings/actions). A personal access token is not required.
+
+After completion, open [Releases](https://github.com/CELFS/twist-cast/releases). Successful platform jobs also retain their packages under the workflow run's **Artifacts** for 14 days, even when another platform fails. Artifacts require a GitHub login; published release assets remain attached to the release.
+
+## Packages and installation
+
+| Asset | Use |
+| --- | --- |
+| `twist-cast-0.1.1-android-arm64-v8a.apk` | Most current Android phones, including current Redmi devices |
+| `twist-cast-0.1.1-android-armeabi-v7a.apk` | Older 32-bit ARM Android devices |
+| `twist-cast-0.1.1-android-x86_64.apk` | x86_64 Android devices and compatible emulators |
+| `twist-cast-0.1.1-macos-universal.dmg` | Apple Silicon and Intel Macs, macOS 12 or newer |
+| `THIRD_PARTY_NOTICES.zip` | Vendored source notices and Flutter-generated Android package notices |
+| `SHA256SUMS.txt` | SHA-256 checksums of the release assets |
+
+On Android, download the matching APK, open it, and allow installation from the app used to open it when prompted. Existing debug builds have a different signing key and must be uninstalled before installing the first release build. Uninstalling removes local pairing data. Subsequent release builds use the same key and can update in place.
+
+On macOS, open the DMG and drag TwistCast to **Applications**. The application is ad-hoc signed, without an Apple Developer certificate or notarization. macOS may block the first launch; after trying to open the app, use **System Settings > Privacy & Security > Open Anyway** if available. Managed computers can prohibit this exception. Installing and running the downloaded package does not require Xcode or an Apple account.
+
+These packages are for early device testing. A successful compilation does not verify real-device screen capture, audio, permissions, or end-to-end pairing. The workflow currently distributes Android and macOS packages; it does not distribute iOS, Windows, or Linux packages.
+
+The notices archive preserves the scope described in [Third-party notices](../THIRD_PARTY_NOTICES.md). It is not a complete inventory of every native SDK's transitive binary dependencies.
+
+## Local Android release build
+
+With the local signing files already provisioned:
+
+```sh
+# Run from the TwistCast repository root.
+source .secrets/release.env
+# Homebrew OpenJDK 17 on Apple Silicon:
+export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
+flutter pub get --enforce-lockfile
+flutter gen-l10n
+flutter build apk --release --split-per-abi --no-pub
+```
+
+The APKs are written to `build/app/outputs/flutter-apk/`. Release builds without all four `TWISTCAST_*` signing environment variables fail; debug builds remain available without the release key. `release.env` is private and machine-specific, so update its keystore path when moving the private files to another computer.
+
+## Next version
+
+Update `pubspec.yaml` with the next application version and a strictly larger build number. Update the displayed version in both ARB files, the broadcast extension's version/build number, and the version references in the documentation. Keep using the same Android signing key.
+
+Run `python3 tool/release.py metadata` to verify the version fields. The release tag must match the application version, for example `v0.1.1`, without the internal build-number suffix.

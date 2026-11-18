@@ -2,11 +2,11 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.0 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available.
+TwistCast 0.1.1 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available.
 
 ## Platform status
 
-| Platform | Role in 0.1.0 | Implementation |
+| Platform | Role in 0.1.1 | Implementation |
 | --- | --- | --- |
 | Android | Share the full phone screen and internal audio | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the full phone screen and internal audio | ReplayKit broadcast extension and App Group socket |
@@ -40,6 +40,10 @@ Guest Wi-Fi, access-point isolation, VPN routing, and host firewalls can prevent
 - No media negotiation or capture starts before both approvals. Signaling uses TLS, and WebRTC encrypts the media transport.
 - Pairing remembers cryptographic identities. It does not attest that the remote executable is an unmodified TwistCast binary.
 - The application does not record or upload screen content. Pairing secrets are not written to application logs.
+
+## Downloads
+
+Download Android APKs and the macOS universal DMG from [GitHub Releases](https://github.com/CELFS/twist-cast/releases). Packages become available after the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) completes successfully. See [Release builds](docs/releases.md) for signing setup, direct configuration links, and installation instructions.
 
 ## Development
 
@@ -79,7 +83,7 @@ export JAVA_HOME=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home
 flutter build apk --debug
 ```
 
-The APK is written to `build/app/outputs/flutter-apk/app-debug.apk`. Debug builds are for testing; release signing must be configured before publishing an Android release. The scaffold's release configuration currently uses the development signing key.
+The APK is written to `build/app/outputs/flutter-apk/app-debug.apk`. Debug builds are for testing. Release builds require the dedicated signing key described in [Release builds](docs/releases.md). They never use the debug signing key.
 
 ## iOS setup
 
@@ -109,13 +113,13 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.0`; the initial build number is `1`.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.1`; the build number is `2`.
 
 The root `temp/` directory is ignored by Git and reserved for local documents. It is not needed to build or run the application.
 
 ## Scope
 
-0.1.0 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
+0.1.1 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
 
 ## License
 
