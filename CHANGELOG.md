@@ -3,6 +3,7 @@
 ## 0.1.3 - Unreleased
 
 - Replace the default Flutter application icons on Android, iOS, macOS, and Windows with the TwistCast landscape-and-portrait screen mark.
+- Check tag references before resolving release commits so new versions without tags can build and publish.
 
 ## 0.1.2 - Unreleased
 

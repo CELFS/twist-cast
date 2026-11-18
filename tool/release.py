@@ -134,7 +134,14 @@ def release_policy():
         if release and not release['draft']:
             reason = 'This version is already published; new packages remain in workflow artifacts.'
         else:
-            commit = github_resource(f'repos/{repository}/commits/{tag}')
+            # Missing tag references return 404; the commits endpoint returns 422.
+            reference = github_resource(f'repos/{repository}/git/ref/tags/{tag}')
+            commit = None
+            if reference is not None:
+                # Resolve annotated tags to their commit as well as lightweight tags.
+                commit = github_resource(f'repos/{repository}/commits/refs/tags/{tag}')
+                if commit is None:
+                    raise SystemExit('Cannot resolve the existing release tag target.')
             if commit is None and release:
                 commit = github_resource(f'repos/{repository}/commits/{release["target_commitish"]}')
                 if commit is None:
