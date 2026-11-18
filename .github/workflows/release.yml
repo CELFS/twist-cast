@@ -211,6 +211,9 @@ jobs:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
+      - name: Identify macOS build inputs
+        id: macos-inputs
+        run: python3 tool/release.py macos-input-key >> "$GITHUB_OUTPUT"
       - uses: ./.github/actions/flutter
         with:
           version: ${{ env.FLUTTER_VERSION }}
@@ -236,14 +239,19 @@ jobs:
             build/macos/ModuleCache.noindex
             build/macos/SDKStatCaches.noindex
             .dart_tool/flutter_build
-          key: macos-build-${{ runner.arch }}-${{ steps.xcode.outputs.build }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock', 'packages/flutter_webrtc/macos/**/Package.swift', 'macos/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-${{ github.sha }}
+          key: macos-build-${{ runner.arch }}-${{ steps.xcode.outputs.build }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock', 'packages/flutter_webrtc/macos/**/Package.swift', 'macos/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-${{ steps.macos-inputs.outputs.key }}
           restore-keys: macos-build-${{ runner.arch }}-${{ steps.xcode.outputs.build }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock', 'packages/flutter_webrtc/macos/**/Package.swift', 'macos/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-
       - name: Report macOS compilation caches
         env:
           SWIFT_HIT: ${{ steps.swift-cache.outputs.cache-hit }}
           NATIVE_HIT: ${{ steps.native-cache.outputs.cache-hit }}
+          SWIFT_KEY: ${{ steps.swift-cache.outputs.cache-matched-key }}
+          NATIVE_KEY: ${{ steps.native-cache.outputs.cache-matched-key }}
         run: |
           echo "Swift package exact cache hit: ${SWIFT_HIT:-false}; native compilation exact cache hit: ${NATIVE_HIT:-false}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Restored Swift packages: ${SWIFT_KEY:-none}; restored native outputs: ${NATIVE_KEY:-none}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Restore timestamps of unchanged build inputs
+        run: python3 tool/release.py restore-input-times
       - name: Compile macOS application
         id: build
         run: flutter build macos --release --no-pub
@@ -255,6 +263,9 @@ jobs:
             ~/Library/Caches/org.swift.swiftpm
             build/macos/SourcePackages
           key: ${{ steps.swift-cache.outputs.cache-primary-key }}
+      - name: Record successful build input timestamps
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.native-cache.outputs.cache-hit != 'true' }}
+        run: python3 tool/release.py save-input-times
       - name: Save native compilation outputs before packaging
         if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.native-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5

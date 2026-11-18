@@ -10,6 +10,8 @@
 - Cache the Android toolchain and compilation outputs, avoid competing Flutter cache writers, and report per-step build durations.
 - Fix macOS architecture verification, cache Flutter's actual Swift package directory, and save prepared caches before packaging checks.
 - Automatically run the full release workflow on pushes to main, while retaining manual platform rebuilds and version-tag triggers.
+- Trim unused platform artifacts from Flutter SDK caches and repair Android toolchain cache extraction over preinstalled SDK files.
+- Preserve unchanged macOS build input timestamps and key native caches by build inputs to reduce unnecessary recompilation and cache uploads.
 
 ## 0.1.0 - Unreleased
 

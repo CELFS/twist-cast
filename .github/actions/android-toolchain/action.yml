@@ -26,6 +26,18 @@ runs:
             output.write('installed=' + str(all((sdk / path / 'source.properties').is_file() for path in paths)).lower() + '\n')
             output.write('build-tools=' + str(sdk / 'build-tools' / config['build_tools']) + '\n')
         PY
+    - name: Prepare existing SDK directories for cache extraction
+      if: inputs.prime != 'true' && steps.config.outputs.installed != 'true'
+      shell: bash
+      env:
+        TOOLCHAIN_PATHS: ${{ steps.config.outputs.paths }}
+      run: |
+        # Hosted images include root-owned SDK files; tar must restore their metadata too.
+        while IFS= read -r path; do
+          if [[ -d "$path" ]]; then
+            sudo chown -R "$(id -u):$(id -g)" "$path"
+          fi
+        done <<< "$TOOLCHAIN_PATHS"
     - id: cache
       if: inputs.prime == 'true' || steps.config.outputs.installed != 'true'
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5

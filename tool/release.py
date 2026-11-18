@@ -5,6 +5,10 @@
 #   python3 tool/release.py notices
 #   python3 tool/release.py checksums
 #   gh api repos/OWNER/REPO/actions/runs/RUN_ID/jobs | python3 tool/release.py timings
+#   python3 tool/release.py macos-input-key
+#   python3 tool/release.py save-input-times
+#   python3 tool/release.py restore-input-times
+# Input timestamps are saved with macOS compilation outputs and restored only for identical files.
 # Outputs go to build/release; metadata also writes GitHub Actions job outputs.
 
 import argparse
@@ -15,11 +19,61 @@ import os
 from pathlib import Path
 import plistlib
 import re
+import subprocess
 import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
 OUTPUT = ROOT / 'build' / 'release'
+INPUT_TIMES = ROOT / 'build/macos/Build/twistcast-input-times.json'
+
+
+def tracked_inputs():
+    paths = subprocess.check_output(['git', 'ls-files', '-z'], cwd=ROOT).decode().split('\0')
+    return [ROOT / path for path in paths if path and
+            not (ROOT / path).is_symlink() and (ROOT / path).is_file()]
+
+
+def macos_input_key():
+    digest = hashlib.sha256()
+    for path in sorted(tracked_inputs()):
+        name = path.relative_to(ROOT).as_posix()
+        if not (name.startswith(('lib/', 'macos/', 'packages/', 'assets/', '.github/', 'tool/')) or
+                name in ('pubspec.yaml', 'pubspec.lock', 'l10n.yaml')):
+            continue
+        digest.update(name.encode() + b'\0' + hashlib.sha256(path.read_bytes()).digest())
+    print('key=' + digest.hexdigest())
+
+
+def input_times(restore):
+    paths = tracked_inputs()
+    paths.extend(path for path in (ROOT / 'lib/l10n/generated').rglob('*')
+                 if path.is_file() and not path.is_symlink())
+    if restore:
+        if not INPUT_TIMES.is_file():
+            print('No input timestamp manifest in the restored compilation cache.')
+            return
+        previous = json.loads(INPUT_TIMES.read_text())
+    else:
+        previous = {}
+    count = 0
+    for path in paths:
+        name = path.relative_to(ROOT).as_posix()
+        digest = hashlib.sha256(path.read_bytes()).hexdigest()
+        info = path.stat()
+        if restore:
+            saved = previous.get(name)
+            # Changed files retain their new timestamps so Xcode recompiles them.
+            if saved and saved['sha256'] == digest:
+                os.utime(path, ns=(info.st_atime_ns, saved['mtime_ns']))
+                count += 1
+        else:
+            previous[name] = {'sha256': digest, 'mtime_ns': info.st_mtime_ns}
+    if not restore:
+        INPUT_TIMES.parent.mkdir(parents=True, exist_ok=True)
+        INPUT_TIMES.write_text(json.dumps(previous, separators=(',', ':')) + '\n')
+    print(f'Restored timestamps for {count} unchanged inputs.' if restore else
+          f'Saved timestamps for {len(previous)} build inputs.')
 
 
 def metadata():
@@ -118,7 +172,8 @@ def timings():
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['metadata', 'notices', 'checksums', 'timings'])
+    parser.add_argument('command', choices=['metadata', 'notices', 'checksums', 'timings',
+                                          'macos-input-key', 'save-input-times', 'restore-input-times'])
     command = parser.parse_args().command
     if command == 'metadata':
         values = metadata()
@@ -131,6 +186,10 @@ def main():
         notices()
     elif command == 'checksums':
         checksums()
+    elif command == 'macos-input-key':
+        macos_input_key()
+    elif command in ('save-input-times', 'restore-input-times'):
+        input_times(restore=command == 'restore-input-times')
     else:
         timings()
 

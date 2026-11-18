@@ -24,7 +24,8 @@ runs:
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
         path: ${{ steps.paths.outputs.CACHE-PATH }}
-        key: twistcast-sdk-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}-${{ inputs.platform }}
+        key: twistcast-sdk-v3-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}-${{ inputs.platform }}
+        restore-keys: twistcast-sdk-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}-${{ inputs.platform }}
     - id: packages
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
       with:
@@ -42,6 +43,24 @@ runs:
       env:
         PLATFORM: ${{ inputs.platform }}
       run: flutter precache "--$PLATFORM"
+    - name: Exclude unused platform artifacts from the SDK cache
+      if: inputs.write-cache == 'true' && steps.sdk.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
+      run: |
+        python3 - <<'PY'
+        import os, shutil
+        from pathlib import Path
+        cache = Path(os.environ['FLUTTER_ROOT']) / 'bin/cache'
+        # Keep the host engine and Dart SDK used by analysis, tests, and compilation.
+        unused = ['ios', 'ios-profile', 'ios-release']
+        if os.environ['PLATFORM'] != 'android':
+            unused.extend(path.name for path in (cache / 'artifacts/engine').glob('android-*'))
+        for name in unused:
+            shutil.rmtree(cache / 'artifacts/engine' / name, ignore_errors=True)
+        shutil.rmtree(cache / 'flutter_web_sdk', ignore_errors=True)
+        PY
     - name: Save the prepared SDK
       if: inputs.write-cache == 'true' && steps.sdk.outputs.cache-hit != 'true'
       uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -63,6 +82,9 @@ runs:
       env:
         SDK_HIT: ${{ steps.sdk.outputs.cache-hit }}
         PUB_HIT: ${{ steps.packages.outputs.cache-hit }}
+        SDK_KEY: ${{ steps.sdk.outputs.cache-matched-key }}
+        PUB_KEY: ${{ steps.packages.outputs.cache-matched-key }}
         WRITER: ${{ inputs.write-cache }}
       run: |
         echo "Flutter SDK exact cache hit: ${SDK_HIT:-false}; package exact cache hit: ${PUB_HIT:-false}; cache writer: $WRITER" >> "$GITHUB_STEP_SUMMARY"
+        echo "Restored SDK: ${SDK_KEY:-none}; restored packages: ${PUB_KEY:-none}" >> "$GITHUB_STEP_SUMMARY"
