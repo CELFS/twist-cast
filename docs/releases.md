@@ -1,6 +1,6 @@
 # Release builds
 
-TwistCast 0.1.2 uses Flutter 3.50.0 and Dart 3.14.0. The application version is `0.1.2`; its internal build number is `3`. `pubspec.yaml` stores these as `0.1.2+3`.
+TwistCast 0.1.3 uses Flutter 3.50.0 and Dart 3.14.0. The application version is `0.1.3`; its internal build number is `4`. `pubspec.yaml` stores these as `0.1.3+4`.
 
 ## Direct links
 
@@ -71,10 +71,10 @@ First builds still download large SDKs. Cache reuse and parallel builds reduce r
 
 | Asset | Use |
 | --- | --- |
-| `twist-cast-0.1.2-android-arm64-v8a.apk` | Most current Android phones, including current Redmi devices |
-| `twist-cast-0.1.2-android-armeabi-v7a.apk` | Older 32-bit ARM Android devices |
-| `twist-cast-0.1.2-android-x86_64.apk` | x86_64 Android devices and compatible emulators |
-| `twist-cast-0.1.2-macos-universal.dmg` | Apple Silicon and Intel Macs, macOS 12 or newer |
+| `twist-cast-0.1.3-android-arm64-v8a.apk` | Most current Android phones, including current Redmi devices |
+| `twist-cast-0.1.3-android-armeabi-v7a.apk` | Older 32-bit ARM Android devices |
+| `twist-cast-0.1.3-android-x86_64.apk` | x86_64 Android devices and compatible emulators |
+| `twist-cast-0.1.3-macos-universal.dmg` | Apple Silicon and Intel Macs, macOS 12 or newer |
 | `THIRD_PARTY_NOTICES.zip` | Vendored source notices and Flutter-generated Android package notices |
 | `SHA256SUMS.txt` | SHA-256 checksums of the release assets |
 
@@ -106,4 +106,4 @@ The APKs are written to `build/app/outputs/flutter-apk/`. Release builds without
 
 Update `pubspec.yaml` with the next application version and a strictly larger build number. Update the displayed version in both ARB files, the broadcast extension's version/build number, and the version references in the documentation. Keep using the same Android signing key.
 
-Run `python3 tool/release.py metadata` to verify the version fields. The release tag must match the application version, for example `v0.1.2`, without the internal build-number suffix.
+Run `python3 tool/release.py metadata` to verify the version fields. The release tag must match the application version, for example `v0.1.3`, without the internal build-number suffix.

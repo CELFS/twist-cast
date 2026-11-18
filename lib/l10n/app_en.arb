@@ -48,5 +48,5 @@
   "sessionEnded": "Session ended. Your screen is no longer shared.",
   "notificationTitle": "TwistCast screen sharing",
   "notificationBody": "Your screen is being shared. Tap to return and stop.",
-  "versionLabel": "TwistCast 0.1.2"
+  "versionLabel": "TwistCast 0.1.3"
 }

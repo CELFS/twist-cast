@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.3 - Unreleased
+
+- Replace the default Flutter application icons on Android, iOS, macOS, and Windows with the TwistCast landscape-and-portrait screen mark.
+
 ## 0.1.2 - Unreleased
 
 - Pace Android internal-audio and silent buffers at their PCM frame duration to prevent unbounded delivery into WebRTC.

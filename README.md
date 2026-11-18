@@ -1,12 +1,16 @@
+<p align="center">
+  <img src="assets/branding/twistcast-icon.png" width="96" alt="TwistCast icon">
+</p>
+
 # TwistCast
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.2 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available.
+TwistCast 0.1.3 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available.
 
 ## Platform status
 
-| Platform | Role in 0.1.2 | Implementation |
+| Platform | Role in 0.1.3 | Implementation |
 | --- | --- | --- |
 | Android | Share the full phone screen and internal audio | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the full phone screen and internal audio | ReplayKit broadcast extension and App Group socket |
@@ -113,7 +117,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.2`; the build number is `3`.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.3`; the build number is `4`.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -121,7 +125,7 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.2 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
+0.1.3 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
 
 ## License
 
