@@ -1,13 +1,15 @@
-import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../cast/cast_controller.dart';
+import '../cast/receiver_view.dart';
 import '../pairing/pairing_card.dart';
 import '../pairing/scanner_page.dart';
 import '../updates/update_card.dart';
 import '../updates/update_controller.dart';
+import 'app_brand.dart';
+import 'app_footer.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({required this.locale, required this.onLocaleChanged, super.key});
@@ -45,9 +47,10 @@ class _HomePageState extends State<HomePage> {
     _cast.notificationBody = text.notificationBody;
     return ListenableBuilder(listenable: _cast, builder: (context, _) {
       final active = ![CastPhase.idle, CastPhase.ended, CastPhase.failed].contains(_cast.phase);
+      final viewing = _cast.phase == CastPhase.casting && !_cast.sending && _cast.media != null;
       return Scaffold(
-        appBar: AppBar(title: Text(text.appName), actions: [
-          Padding(padding: const EdgeInsets.only(right: 20), child: DropdownButton<Locale>(
+        appBar: AppBar(title: const AppBrand(), centerTitle: false, titleSpacing: 16, actions: [
+          Padding(padding: const EdgeInsets.only(right: 16), child: DropdownButton<Locale>(
             value: widget.locale, underline: const SizedBox.shrink(),
             items: [
               DropdownMenuItem(value: const Locale('en'), child: Text(text.english)),
@@ -56,7 +59,10 @@ class _HomePageState extends State<HomePage> {
             onChanged: (value) { if (value != null) widget.onLocaleChanged(value); },
           )),
         ]),
-        body: SafeArea(child: Center(child: SingleChildScrollView(
+        bottomNavigationBar: const AppFooter(),
+        body: SafeArea(bottom: false, child: viewing
+          ? ReceiverView(renderer: _cast.media!.renderer, onStop: _cast.stop)
+          : Center(child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 960),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -91,8 +97,9 @@ class _HomePageState extends State<HomePage> {
                 padding: const EdgeInsets.all(24), child: Column(children: [
                   Text(text.scanHint),
                   const SizedBox(height: 16),
-                  if (_cast.qr != null) Container(color: Colors.white, padding: const EdgeInsets.all(12),
-                    child: QrImageView(data: _cast.qr!, size: 260, backgroundColor: Colors.white)),
+                  if (_cast.qr != null) ConstrainedBox(constraints: const BoxConstraints(maxWidth: 284),
+                    child: Container(color: Colors.white, padding: const EdgeInsets.all(12),
+                      child: QrImageView(data: _cast.qr!, backgroundColor: Colors.white))),
                   const SizedBox(height: 12),
                   Text(text.invitationExpires),
                   if (_cast.addresses.length > 1) DropdownButton<String>(
@@ -118,11 +125,6 @@ class _HomePageState extends State<HomePage> {
                   approved: _cast.approved, onApprove: _cast.approve, onReject: _cast.stop),
               if (_cast.phase == CastPhase.casting) ...[
                 _Notice(text: text.secureSession, icon: Icons.lock_outline),
-                if (!_cast.sending && _cast.media != null) SizedBox(
-                  height: MediaQuery.sizeOf(context).height * 0.6,
-                  child: ColoredBox(color: Colors.black, child: RTCVideoView(_cast.media!.renderer,
-                    objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain)),
-                ),
                 if (_cast.sending) Padding(padding: const EdgeInsets.all(24), child: Text(text.sharingHint)),
               ],
               if (_cast.isMobile) ...[
@@ -142,7 +144,6 @@ class _HomePageState extends State<HomePage> {
                 }),
                 const SizedBox(height: 16),
               ],
-              Text(text.versionLabel, style: theme.textTheme.labelSmall, textAlign: TextAlign.center),
             ]),
           ),
         ))),

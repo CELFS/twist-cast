@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.5 - Unreleased
+
+- Fit desktop receiver windows to the shared screen aspect ratio, including orientation changes.
+- Keep receiver controls above the shared screen and hide setup guidance during a session.
+- Display the application icon beside the left-aligned header title.
+- Anchor the copyright, author, and version footer to the bottom of the window.
+
 ## 0.1.4 - Unreleased
 
 - Check published GitHub Releases from the application and display the installed and latest versions.

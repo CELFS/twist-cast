@@ -90,6 +90,9 @@ def metadata():
         strings = json.loads((ROOT / f'lib/l10n/app_{locale}.arb').read_text())
         if strings['versionLabel'] != f'TwistCast {version}':
             raise SystemExit(f'The {locale} interface version does not match pubspec.yaml.')
+    strings = json.loads((ROOT / 'lib/l10n/app_en.arb').read_text())
+    if not strings['footerLabel'].endswith(f' · v{version}'):
+        raise SystemExit('The interface footer version does not match pubspec.yaml.')
     with (ROOT / 'ios/BroadcastExtension/Info.plist').open('rb') as stream:
         extension = plistlib.load(stream)
     if (extension['CFBundleShortVersionString'], extension['CFBundleVersion']) != (version, build_number):

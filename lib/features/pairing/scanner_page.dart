@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../home/app_footer.dart';
 
 class ScannerPage extends StatefulWidget {
   const ScannerPage({super.key});
@@ -21,6 +22,7 @@ class _ScannerPageState extends State<ScannerPage> {
     final text = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(title: Text(text.scanQr)),
+      bottomNavigationBar: const AppFooter(),
       body: Column(children: [
         Padding(padding: const EdgeInsets.all(24), child: Text(text.scanHint)),
         Expanded(child: MobileScanner(
