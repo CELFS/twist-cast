@@ -71,5 +71,14 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>TwistCast connects to devices you approve on your local network.</string>
+	<key>NSBonjourServices</key>
+	<array><string>_twistcast._tcp</string></array>
+	<key>NSCameraUsageDescription</key>
+	<string>Scan the pairing code displayed by your computer.</string>
+<key>RTCAppGroupIdentifier</key><string>group.app.twist.cast</string>
+<key>RTCScreenSharingExtension</key><string>app.twist.cast.broadcast</string>
+<key>UIBackgroundModes</key><array><string>audio</string></array>
 </dict>
 </plist>

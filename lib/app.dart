@@ -17,6 +17,11 @@ class _TwistCastAppState extends State<TwistCastApp> {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF315DCD)),
+        scaffoldBackgroundColor: const Color(0xFFF5F7FB),
+        useMaterial3: true,
+      ),
       locale: _locale,
       localizationsDelegates: const [
         AppLocalizations.delegate,

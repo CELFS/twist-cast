@@ -54,3 +54,6 @@ temp/
 
 # Generated localization code
 /lib/l10n/generated/
+
+# Kotlin compiler cache
+/android/.kotlin/
