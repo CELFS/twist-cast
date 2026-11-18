@@ -3,6 +3,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../cast/cast_controller.dart';
+import '../cast/diagnostics_card.dart';
 import '../cast/receiver_page.dart';
 import '../pairing/pairing_card.dart';
 import '../pairing/scanner_page.dart';
@@ -60,7 +61,8 @@ class _HomePageState extends State<HomePage> {
         ]);
       if (viewing) {
         return ReceiverPage(renderer: _cast.media!.renderer,
-          onStop: _cast.stop, header: header);
+          onStop: _cast.stop, header: header,
+          diagnostics: _cast.diagnostics == null ? null : DiagnosticsCard(log: _cast.diagnostics!));
       }
       return Scaffold(
         appBar: header,
@@ -141,6 +143,7 @@ class _HomePageState extends State<HomePage> {
                 OutlinedButton.icon(onPressed: _cast.stop, icon: const Icon(Icons.stop_circle_outlined), label: Text(text.stop)),
               ],
               const SizedBox(height: 24),
+              if (_cast.diagnostics != null) DiagnosticsCard(log: _cast.diagnostics!),
               if (UpdateController.supported) ...[
                 UpdateCard(sessionActive: active, onInstallingChanged: (value) {
                   if (mounted) setState(() => _installingUpdate = value);

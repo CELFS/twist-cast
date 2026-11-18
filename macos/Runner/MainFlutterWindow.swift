@@ -48,6 +48,9 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    let diagnostics = DiagnosticExport()
+    FlutterMethodChannel(name: "app.twist.cast/diagnostics", binaryMessenger: flutterViewController.engine.binaryMessenger)
+      .setMethodCallHandler { call, result in diagnostics.handle(call, result: result) }
     let updates = AppUpdates()
     self.updates = updates
     FlutterMethodChannel(name: "app.twist.cast/updates", binaryMessenger: flutterViewController.engine.binaryMessenger)

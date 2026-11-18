@@ -16,9 +16,13 @@ class MainActivity : FlutterActivity() {
     private var audioPermission: MethodChannel.Result? = null
     private var events: EventChannel.EventSink? = null
     private var updates: AppUpdates? = null
+    private var diagnosticExport: DiagnosticExport? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        diagnosticExport = DiagnosticExport(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/diagnostics")
+            .setMethodCallHandler(diagnosticExport)
         updates = AppUpdates(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/updates")
             .setMethodCallHandler(updates)
@@ -73,9 +77,17 @@ class MainActivity : FlutterActivity() {
 
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/updates").setMethodCallHandler(null)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/diagnostics").setMethodCallHandler(null)
+        diagnosticExport?.dispose()
+        diagnosticExport = null
         updates?.dispose()
         updates = null
         super.cleanUpFlutterEngine(flutterEngine)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        diagnosticExport?.onResult(requestCode, resultCode, data)
     }
 
     override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {

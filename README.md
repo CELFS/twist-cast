@@ -6,13 +6,13 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.6 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
+TwistCast 0.1.7 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
 
 During a session, the receiver places its controls above the shared screen and hides setup guidance. Desktop windows fit the incoming screen aspect ratio, including orientation changes, while the picture remains fully visible. The application header includes the TwistCast icon, and the copyright and version stay at the bottom of the window.
 
 ## Platform status
 
-| Platform | Role in 0.1.6 | Implementation |
+| Platform | Role in 0.1.7 | Implementation |
 | --- | --- | --- |
 | Android | Share the full phone screen and internal audio | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the full phone screen and internal audio | ReplayKit broadcast extension and App Group socket |
@@ -127,7 +127,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.6`; the local development build number is `7`. CI assigns increasing build numbers independently for published updates.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.7`; the local development build number is `8`. CI assigns increasing build numbers independently for published updates.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -135,8 +135,14 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.6 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
+0.1.7 shares the entire phone screen with one desktop receiver. Remote input, clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
 
 ## License
 
 [MIT](LICENSE). Third-party components retain their own licenses. See [Third-party notices](THIRD_PARTY_NOTICES.md) for source attributions, complete license texts, and distribution requirements.
+
+### Connection diagnostics
+
+After reproducing a delay, use **Connection diagnostics → Save report** on both Android and macOS. On macOS, open the receiver titlebar tools to access the report during a session. **Mark issue** records the moment you notice a stall. Reports remain available after stopping until another media session begins or the app exits. Only the newest 1,800 records are retained; the report includes the number discarded.
+
+Reports contain one-second interval audio/video statistics and local event timestamps, not screen content, audio recordings, peer addresses, SDP, or pairing credentials. Device clocks are not synchronized. Android reports also include capture frame counts, callback time, capture dimensions, and the longest frame interval since the previous sample. A long interval can be normal for an unchanged screen. macOS reports also include cumulative texture submissions, pending-frame drops, conversion time, and raster handoff time; these do not measure physical display presentation. Buffer and processing averages are diagnostic components, not an end-to-end latency measurement; unavailable WebRTC fields are omitted. Compare pause/resume behavior with audio enabled and disabled under the same device and network conditions.

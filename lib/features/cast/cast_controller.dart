@@ -9,6 +9,7 @@ import '../../core/device_identity.dart';
 import '../../core/pairing_invitation.dart';
 import '../../core/secure_session.dart';
 import 'cast_media.dart';
+import 'diagnostic_log.dart';
 
 enum CastPhase { idle, preparing, receiving, searching, pairing, connecting, casting, ended, failed }
 
@@ -29,6 +30,7 @@ class CastController extends ChangeNotifier {
   DeviceIdentity? _identity;
   SecureSession? _session;
   CastMedia? media;
+  DiagnosticLog? diagnostics;
   BonsoirBroadcast? _broadcast;
   BonsoirDiscovery? _discovery;
   StreamSubscription<BonsoirDiscoveryEvent>? _discoveryEvents;
@@ -59,7 +61,10 @@ class CastController extends ChangeNotifier {
       if (generation != _generation) return;
       _update(CastPhase.connecting);
       _connectionDeadline = Timer(const Duration(seconds: 90), () => stop(failed: true));
-      final transport = CastMedia(send: session.send,
+      final log = DiagnosticLog(sending ? 'sender' : 'receiver');
+      diagnostics = log;
+      log.add({'audioEnabled': audio});
+      final transport = CastMedia(send: session.send, log: log,
         onStopped: () { if (generation == _generation) stop(); },
         onConnected: () {
           if (generation != _generation) return;
@@ -178,6 +183,7 @@ class CastController extends ChangeNotifier {
     try {
       if (media != null) await media!.setAudio(value);
       audio = value;
+      diagnostics?.add({'event': 'audio-change', 'audioEnabled': value});
     } catch (_) { await stop(failed: true); }
     audioBusy = false;
     if (!_disposed) notifyListeners();
@@ -201,6 +207,7 @@ class CastController extends ChangeNotifier {
     _connectionDeadline?.cancel();
     final session = _session;
     final transport = media;
+    if (transport != null) diagnostics?.event(failed ? 'session-failed' : 'session-stop');
     _session = null;
     media = null;
     comparison = null;

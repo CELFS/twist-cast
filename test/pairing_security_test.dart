@@ -1,5 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
+import 'package:twist_cast/features/cast/diagnostic_log.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
@@ -48,7 +50,7 @@ void main() {
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.6'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.7'), findsOneWidget);
     expect(tester.getBottomRight(find.byType(AppFooter)).dy, 600);
     expect(tester.getTopLeft(find.byType(AppBrand)).dx, 16);
     expect(find.text('Connected · encrypted screen sharing'), findsNothing);
@@ -193,6 +195,50 @@ void main() {
     expect(UpdateController.checkError(const UpdateHttpException(403, true)), 'checkRateLimit');
     expect(UpdateController.checkError(const UpdateHttpException(404, false)), 'checkService');
     expect(UpdateController.checkError(const FormatException('manifest')), 'checkMetadata');
+  });
+
+  test('diagnostic export retains native build identity and surfaces save failures', () async {
+    const updates = MethodChannel('app.twist.cast/updates');
+    const export = MethodChannel('app.twist.cast/diagnostics');
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(updates, (_) async => {
+      'version': '0.1.7', 'buildNumber': 10020, 'targetUrl': 'private-value',
+    });
+    messenger.setMockMethodCallHandler(export, (call) async {
+      final report = jsonDecode((call.arguments as Map)['json'] as String) as Map;
+      expect(report.toString(), isNot(contains('private-value')));
+      expect((report['records'] as List).last['installedBuild'], 10020);
+      return false;
+    });
+    addTearDown(() {
+      messenger.setMockMethodCallHandler(updates, null);
+      messenger.setMockMethodCallHandler(export, null);
+    });
+    final log = DiagnosticLog('receiver');
+    expect(await log.export(), isFalse);
+    messenger.setMockMethodCallHandler(export, (_) async => throw PlatformException(code: 'export'));
+    await expectLater(log.export(), throwsA(isA<PlatformException>()));
+  });
+
+  test('diagnostics bound retained records and measure interval audio throughput', () {
+    final log = DiagnosticLog('sender');
+    for (var i = 0; i < DiagnosticLog.capacity + 3; i++) {
+      log.add({'index': i});
+    }
+    final decoded = jsonDecode(log.encode()) as Map;
+    expect((decoded['records'] as List).length, DiagnosticLog.capacity);
+    expect(decoded['discardedRecords'], 4);
+    final samples = CastStatsSamples();
+    StatsReport audio(int bytes, int concealed) => StatsReport('audio', 'inbound-rtp', 0, {
+      'kind': 'audio', 'bytesReceived': bytes, 'concealedSamples': concealed,
+      'address': 'must-not-export',
+    });
+    samples.add([audio(1000, 10)]);
+    final metrics = samples.add([audio(3000, 20)], intervalMs: 1000).single;
+    expect(metrics['bytesReceivedKbps'], 16);
+    expect(metrics['concealedSamplesDelta'], 10);
+    expect(metrics.containsKey('address'), isFalse);
+    expect(samples.add([audio(0, 0)], intervalMs: 1000).single.containsKey('bytesReceivedKbps'), isFalse);
   });
 
   test('media diagnostics measure interval delay and discard reset counters', () {

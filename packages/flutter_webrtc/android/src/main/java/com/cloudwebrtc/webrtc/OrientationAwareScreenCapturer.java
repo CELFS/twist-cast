@@ -40,6 +40,23 @@ public class OrientationAwareScreenCapturer implements VideoCapturer, VideoSink 
     private SurfaceTextureHelper surfaceTextureHelper;
     private CapturerObserver capturerObserver;
     private long numCapturedFrames = 0;
+    private final Object diagnosticLock = new Object();
+    private long callbackNanos = 0;
+    private long lastFrameNanos = 0;
+    private long maxGapNanos = 0;
+
+    public java.util.Map<String, Object> diagnosticSnapshot() {
+        synchronized (diagnosticLock) {
+            java.util.Map<String, Object> metrics = new java.util.HashMap<>();
+            metrics.put("capturedFrames", numCapturedFrames);
+            metrics.put("callbackSeconds", callbackNanos / 1e9);
+            metrics.put("maxFrameGapMs", maxGapNanos / 1e6);
+            metrics.put("width", oldWidth);
+            metrics.put("height", oldHeight);
+            maxGapNanos = 0;
+            return metrics;
+        }
+    }
     private MediaProjection mediaProjection;
     private volatile boolean isDisposed = false;
     private volatile boolean isStopped = false;
@@ -66,6 +83,7 @@ public class OrientationAwareScreenCapturer implements VideoCapturer, VideoSink 
         // Silently drop in-flight frames that arrive after stop/dispose.
         // stopCapture() no longer holds the monitor (synchronized removed), so guard explicitly here.
         if (isDisposed || isStopped) return;
+        long began = android.os.SystemClock.elapsedRealtimeNanos();
         this.isPortrait = isDeviceOrientationPortrait();
         final int max = Math.max(this.height, this.width);
         final int min = Math.min(this.height, this.width);
@@ -77,6 +95,12 @@ public class OrientationAwareScreenCapturer implements VideoCapturer, VideoSink 
             changeCaptureFormat(newW, newH, 15);
         }
         capturerObserver.onFrameCaptured(frame);
+        synchronized (diagnosticLock) {
+            numCapturedFrames++;
+            callbackNanos += android.os.SystemClock.elapsedRealtimeNanos() - began;
+            if (lastFrameNanos != 0) maxGapNanos = Math.max(maxGapNanos, began - lastFrameNanos);
+            lastFrameNanos = began;
+        }
     }
 
     private boolean isDeviceOrientationPortrait() {
@@ -246,6 +270,6 @@ public class OrientationAwareScreenCapturer implements VideoCapturer, VideoSink 
     }
 
     public long getNumCapturedFrames() {
-        return numCapturedFrames;
+        synchronized (diagnosticLock) { return numCapturedFrames; }
     }
 }

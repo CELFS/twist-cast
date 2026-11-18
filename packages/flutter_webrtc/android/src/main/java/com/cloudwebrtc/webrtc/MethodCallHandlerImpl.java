@@ -656,6 +656,14 @@ public class MethodCallHandlerImpl implements MethodCallHandler, StateProvider {
         peerConnectionAddICECandidate(new ConstraintsMap(candidate), peerConnectionId, result);
         break;
       }
+      case "screenCaptureDiagnostics": {
+        String trackId = call.argument("trackId");
+        GetUserMediaImpl.VideoCapturerInfoEx info = getUserMediaImpl.getCapturerInfo(trackId);
+        if (info != null && info.capturer instanceof OrientationAwareScreenCapturer) {
+          result.success(((OrientationAwareScreenCapturer) info.capturer).diagnosticSnapshot());
+        } else result.success(new HashMap<String, Object>());
+        break;
+      }
       case "getStats": {
         String peerConnectionId = call.argument("peerConnectionId");
         String trackId = call.argument("trackId");

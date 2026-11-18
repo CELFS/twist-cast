@@ -10,10 +10,11 @@ import 'receiver_view.dart';
 
 class ReceiverPage extends StatefulWidget {
   const ReceiverPage({required this.renderer, required this.onStop,
-    required this.header, super.key});
+    required this.header, this.diagnostics, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final PreferredSizeWidget header;
+  final Widget? diagnostics;
 
   @override
   State<ReceiverPage> createState() => _ReceiverPageState();
@@ -88,6 +89,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
                 SizedBox(height: widget.header.preferredSize.height, child: widget.header),
                 ReceiverToolbar(onStop: widget.onStop, headerVisible: true,
                   onToggleHeader: () => setState(() => _showHeader = false)),
+                if (widget.diagnostics != null) widget.diagnostics!,
               ],
             )))),
           ),

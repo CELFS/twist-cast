@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.7 - Unreleased
+
+- Retain bounded per-device media diagnostics across session shutdown and export JSON reports through the Android and macOS system save dialogs.
+- Sample audio and video statistics every second, including interval throughput, loss, keyframe requests, encoding, decoding, buffering, and audio compensation counters.
+- Record Android capture cadence and callback counters alongside macOS texture conversion, pending-frame drops, and raster handoff counters without changing the rendering policy.
+- Add manual issue markers to correlate observed stalls with local session metrics without recording screen or audio content.
+
 ## 0.1.6 - Unreleased
 
 - Move macOS receiver controls into a titlebar button and an on-demand overlay, keeping the shared screen free of a separate toolbar.

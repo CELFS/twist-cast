@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 import 'cast_diagnostics.dart';
+import 'diagnostic_log.dart';
 
 class CastMedia {
-  CastMedia({required this.send, required this.onStopped, required this.onConnected});
+  CastMedia({required this.send, required this.onStopped, required this.onConnected, required this.log});
+  final DiagnosticLog log;
   final void Function(Map<String, dynamic>) send;
   final void Function() onStopped;
   final void Function() onConnected;
@@ -35,7 +37,19 @@ class CastMedia {
     if (_closed) { await renderer.dispose(); return; }
     _peer = await createPeerConnection({'iceServers': <dynamic>[], 'sdpSemantics': 'unified-plan'});
     if (_closed) { await _peer?.dispose(); return; }
-    _diagnostics = CastDiagnostics(_peer!);
+    _diagnostics = CastDiagnostics(_peer!, log, renderSnapshot: Platform.isMacOS ? () async {
+      final raw = await const MethodChannel('FlutterWebRTC.Method')
+          .invokeMapMethod<String, dynamic>('videoRendererDiagnostics', {'textureId': renderer.textureId});
+      return {for (final entry in (raw ?? <String, dynamic>{}).entries)
+        if (entry.value is num) entry.key: entry.value as num};
+    } : Platform.isAndroid ? () async {
+      final tracks = _stream?.getVideoTracks();
+      if (tracks == null || tracks.isEmpty) return <String, num>{};
+      final raw = await const MethodChannel('FlutterWebRTC.Method')
+          .invokeMapMethod<String, dynamic>('screenCaptureDiagnostics', {'trackId': tracks.first.id});
+      return {for (final entry in (raw ?? <String, dynamic>{}).entries)
+        if (entry.value is num) entry.key: entry.value as num};
+    } : null);
     _peer!.onIceCandidate = (candidate) {
       if (!_closed && candidate.candidate != null) {
         send({'type': 'ice', 'candidate': candidate.candidate,
@@ -45,6 +59,7 @@ class CastMedia {
     renderer.onFirstFrameRendered = () {
       if (_closed || _sending || _reportedPlaying) return;
       _reportedPlaying = true;
+      log.event('first-frame');
       send({'type': 'playing'});
       onConnected();
     };
@@ -54,6 +69,7 @@ class CastMedia {
     _peer!.onConnectionState = (state) {
       if (_closed) return;
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateConnected) {
+        log.event('transport-connected');
         _diagnostics?.start();
       }
       if (state == RTCPeerConnectionState.RTCPeerConnectionStateFailed ||
@@ -130,6 +146,7 @@ class CastMedia {
       case 'playing':
         if (!_sending || _reportedPlaying) throw const FormatException('Unexpected playback acknowledgment');
         _reportedPlaying = true;
+      log.event('first-frame');
         onConnected();
       case 'offer':
       case 'answer':
