@@ -1,0 +1,23 @@
+{
+  "@@locale": "en",
+  "appName": "TwistCast",
+  "@appName": {
+    "description": "The application name."
+  },
+  "tagline": "Private screen sharing across your devices.",
+  "@tagline": {
+    "description": "A short description of the application."
+  },
+  "language": "Language",
+  "@language": {
+    "description": "The interface language selector label."
+  },
+  "english": "English",
+  "@english": {
+    "description": "The English language option."
+  },
+  "chinese": "简体中文",
+  "@chinese": {
+    "description": "The Simplified Chinese language option, written in its own language."
+  }
+}
