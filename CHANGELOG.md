@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.2 - Unreleased
+
+- Pace Android internal-audio and silent buffers at their PCM frame duration to prevent unbounded delivery into WebRTC.
+- Release failed playback recorders and enable internal audio only after recording starts successfully.
+
 ## 0.1.1 - Unreleased
 
 - Build signed Android APKs and a universal macOS DMG in parallel through GitHub Actions, and publish the packages to GitHub Releases after checks pass.
