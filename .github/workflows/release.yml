@@ -4,6 +4,12 @@ on:
   push:
     tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      target:
+        description: Build all packages and publish, or rebuild selected packages as workflow artifacts
+        type: choice
+        default: all
+        options: [all, android, macos, android-arm64-v8a, android-armeabi-v7a, android-x86_64]
 
 permissions:
   contents: read
@@ -23,11 +29,18 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      android: ${{ steps.version.outputs.android }}
+      macos: ${{ steps.version.outputs.macos }}
+      publish: ${{ steps.version.outputs.publish }}
+      android_matrix: ${{ steps.version.outputs.android_matrix }}
+      notices_abi: ${{ steps.version.outputs.notices_abi }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - id: version
+        env:
+          RELEASE_TARGET: ${{ inputs.target || 'all' }}
         run: python3 tool/release.py metadata
       - name: Check any existing release tag points to this commit
         env:
@@ -43,30 +56,49 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      # This is the only Linux Flutter cache writer; Android jobs only restore it.
+      - uses: ./.github/actions/flutter
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-      - run: flutter pub get --enforce-lockfile
-      - run: flutter gen-l10n
+          version: ${{ env.FLUTTER_VERSION }}
+          platform: ${{ needs.metadata.outputs.android == 'true' && 'android' || 'linux' }}
+          write-cache: 'true'
       - run: flutter analyze --no-pub
       - run: flutter test --no-pub
 
-  android:
+  android-toolchain:
     needs: metadata
+    if: needs.metadata.outputs.android == 'true'
     runs-on: ubuntu-24.04
-    timeout-minutes: 40
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/android-toolchain
+        with:
+          prime: 'true'
+
+  android:
+    needs: [metadata, android-toolchain]
+    if: needs.metadata.outputs.android == 'true'
+    name: android (${{ matrix.abi }})
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.metadata.outputs.android_matrix) }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     env:
       TWISTCAST_KEYSTORE_PATH: ${{ github.workspace }}/.secrets/twist-cast-release.jks
       TWISTCAST_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
       TWISTCAST_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
       TWISTCAST_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      # CI-only settings keep local development resource usage unchanged.
+      GRADLE_OPTS: -Dorg.gradle.caching=true -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=4 -Dorg.gradle.daemon=false
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
       - name: Restore the dedicated release signing key
@@ -86,36 +118,79 @@ jobs:
           path.write_bytes(base64.b64decode(os.environ['ANDROID_KEYSTORE_BASE64'].strip(), validate=True))
           path.chmod(0o600)
           PY
-      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
-          cache-dependency-path: |
-            android/**/*.gradle.kts
-            android/gradle/wrapper/gradle-wrapper.properties
-            packages/flutter_webrtc/android/build.gradle
-            pubspec.lock
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      - uses: gradle/actions/setup-gradle@0723195856401067f7a2779048b490ace7a47d7c # v5
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-      - run: flutter pub get --enforce-lockfile
-      - run: flutter gen-l10n
-      - run: flutter build apk --release --split-per-abi --no-pub
-      - name: Collect Android packages and notices
+          cache-read-only: false
+          cache-cleanup: never
+      - uses: ./.github/actions/android-toolchain
+        id: toolchain
+      - uses: ./.github/actions/flutter
+        with:
+          version: ${{ env.FLUTTER_VERSION }}
+          platform: android
+      - name: Check the pinned toolchain matches Flutter
+        run: |
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+          config = json.loads(Path('.github/android-toolchain.json').read_text())
+          extension = (Path(os.environ['FLUTTER_ROOT']) / 'packages/flutter_tools/gradle/src/main/kotlin/FlutterExtension.kt').read_text()
+          assert re.search(r'ndkVersion: String = "([^"]+)"', extension).group(1) == config['ndk']
+          assert int(re.search(r'compileSdkVersion: Int = (\d+)', extension).group(1)) == config['platform']
+          PY
+      - name: Restore Flutter compilation outputs
+        id: flutter-build-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .dart_tool/flutter_build
+            build/app/intermediates/flutter/release
+          key: flutter-build-android-${{ matrix.abi }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}-${{ github.sha }}
+          restore-keys: flutter-build-android-${{ matrix.abi }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock') }}-
+      - name: Report Android compilation cache
+        env:
+          CACHE_HIT: ${{ steps.flutter-build-cache.outputs.cache-hit }}
+        run: |
+          echo "Flutter compilation exact cache hit: ${CACHE_HIT:-false}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Compile Android APK
+        id: build
+        env:
+          TARGET: ${{ matrix.target }}
+        run: flutter build apk --release --split-per-abi --target-platform "$TARGET" --no-pub
+      - name: Save Flutter compilation outputs before packaging
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        if: steps.flutter-build-cache.outputs.cache-hit != 'true'
+        with:
+          path: |
+            .dart_tool/flutter_build
+            build/app/intermediates/flutter/release
+          key: ${{ steps.flutter-build-cache.outputs.cache-primary-key }}
+      - name: Verify and collect the Android package
         env:
           VERSION: ${{ needs.metadata.outputs.version }}
+          ABI: ${{ matrix.abi }}
+          NOTICES_ABI: ${{ needs.metadata.outputs.notices_abi }}
+          ANDROID_BUILD_TOOLS: ${{ steps.toolchain.outputs.build-tools }}
         run: |
+          apk="build/app/outputs/flutter-apk/app-$ABI-release.apk"
+          "$ANDROID_BUILD_TOOLS/apksigner" verify "$apk"
+          APK="$apk" python3 - <<'PY'
+          import os, zipfile
+          with zipfile.ZipFile(os.environ['APK']) as apk:
+              abis = {name.split('/')[1] for name in apk.namelist() if name.startswith('lib/') and name.endswith('.so')}
+          if abis != {os.environ['ABI']}:
+              raise SystemExit(f'Unexpected APK architectures: {abis}')
+          PY
           mkdir -p build/release
-          for abi in arm64-v8a armeabi-v7a x86_64; do
-            cp "build/app/outputs/flutter-apk/app-$abi-release.apk" "build/release/twist-cast-$VERSION-android-$abi.apk"
-          done
-          python3 tool/release.py notices
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+          cp "$apk" "build/release/twist-cast-$VERSION-android-$ABI.apk"
+          if [[ "$ABI" == "$NOTICES_ABI" ]]; then python3 tool/release.py notices; fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: android-release
+          name: android-${{ matrix.abi }}-release
           path: build/release/*
           if-no-files-found: error
           compression-level: 0
@@ -126,34 +201,75 @@ jobs:
 
   macos:
     needs: metadata
+    if: needs.metadata.outputs.macos == 'true'
     runs-on: macos-15
-    timeout-minutes: 40
+    timeout-minutes: 30
     env:
       FLUTTER_MACOS_ARM64_ONLY: 'false'
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      - uses: ./.github/actions/flutter
         with:
-          flutter-version: ${{ env.FLUTTER_VERSION }}
-          channel: stable
-          cache: true
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+          version: ${{ env.FLUTTER_VERSION }}
+          platform: macos
+          write-cache: 'true'
+      - name: Identify the Xcode toolchain
+        id: xcode
+        run: echo "build=$(xcodebuild -version | awk '/Build version/ {print $3}')" >> "$GITHUB_OUTPUT"
+      - name: Restore Swift packages
+        id: swift-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: |
             ~/Library/Caches/org.swift.swiftpm
-            ~/Library/Developer/Xcode/DerivedData/*/SourcePackages
-          key: macos-spm-${{ runner.arch }}-${{ hashFiles('pubspec.lock', '**/Package.swift', '**/Package.resolved') }}
-      - run: flutter pub get --enforce-lockfile
-      - run: flutter gen-l10n
-      - run: flutter build macos --release --no-pub
+            build/macos/SourcePackages
+          key: macos-spm-v2-${{ runner.arch }}-${{ steps.xcode.outputs.build }}-${{ hashFiles('pubspec.lock', 'packages/flutter_webrtc/macos/**/Package.swift', 'macos/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+      - name: Restore native compilation outputs
+        id: native-cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            build/macos/Build
+            build/macos/ModuleCache.noindex
+            build/macos/SDKStatCaches.noindex
+            .dart_tool/flutter_build
+          key: macos-build-${{ runner.arch }}-${{ steps.xcode.outputs.build }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock', 'packages/flutter_webrtc/macos/**/Package.swift', 'macos/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-${{ github.sha }}
+          restore-keys: macos-build-${{ runner.arch }}-${{ steps.xcode.outputs.build }}-${{ env.FLUTTER_VERSION }}-${{ hashFiles('pubspec.lock', 'packages/flutter_webrtc/macos/**/Package.swift', 'macos/Runner.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}-
+      - name: Report macOS compilation caches
+        env:
+          SWIFT_HIT: ${{ steps.swift-cache.outputs.cache-hit }}
+          NATIVE_HIT: ${{ steps.native-cache.outputs.cache-hit }}
+        run: |
+          echo "Swift package exact cache hit: ${SWIFT_HIT:-false}; native compilation exact cache hit: ${NATIVE_HIT:-false}" >> "$GITHUB_STEP_SUMMARY"
+      - name: Compile macOS application
+        id: build
+        run: flutter build macos --release --no-pub
+      - name: Save resolved Swift packages
+        if: ${{ !cancelled() && steps.build.outcome != 'skipped' && steps.swift-cache.outcome == 'success' && steps.swift-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm
+            build/macos/SourcePackages
+          key: ${{ steps.swift-cache.outputs.cache-primary-key }}
+      - name: Save native compilation outputs before packaging
+        if: ${{ !cancelled() && steps.build.outcome == 'success' && steps.native-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            build/macos/Build
+            build/macos/ModuleCache.noindex
+            build/macos/SDKStatCaches.noindex
+            .dart_tool/flutter_build
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - name: Verify and package the universal macOS application
         env:
           VERSION: ${{ needs.metadata.outputs.version }}
         run: |
           app=build/macos/Build/Products/Release/TwistCast.app
-          lipo -verify_arch arm64 x86_64 "$app/Contents/MacOS/TwistCast"
+          lipo "$app/Contents/MacOS/TwistCast" -verify_arch arm64 x86_64
           codesign --verify --deep --strict --verbose=2 "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
           mkdir -p build/dmg build/release
@@ -163,7 +279,7 @@ jobs:
           unzip -q build/release/THIRD_PARTY_NOTICES.zip -d build/dmg/Licenses
           rm build/release/THIRD_PARTY_NOTICES.zip
           hdiutil create -volname TwistCast -srcfolder build/dmg -ov -format UDZO "build/release/twist-cast-$VERSION-macos-universal.dmg"
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: macos-release
           path: build/release/*.dmg
@@ -173,6 +289,7 @@ jobs:
 
   publish:
     needs: [metadata, checks, android, macos]
+    if: needs.metadata.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -182,15 +299,22 @@ jobs:
       TAG: ${{ needs.metadata.outputs.tag }}
       VERSION: ${{ needs.metadata.outputs.version }}
     steps:
-      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           persist-credentials: false
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: '*-release'
           path: build/release
           merge-multiple: true
-      - run: python3 tool/release.py checksums
+      - name: Check the complete asset set and write checksums
+        run: |
+          test -f "build/release/twist-cast-$VERSION-macos-universal.dmg"
+          for abi in arm64-v8a armeabi-v7a x86_64; do
+            test -f "build/release/twist-cast-$VERSION-android-$abi.apk"
+          done
+          test -f build/release/THIRD_PARTY_NOTICES.zip
+          python3 tool/release.py checksums
       - name: Publish the complete release
         run: |
           cat > build/release-notes.md <<'NOTES'
@@ -211,3 +335,20 @@ jobs:
           fi
           gh release upload "$TAG" build/release/* --clobber
           gh release edit "$TAG" --draft=false --notes-file build/release-notes.md
+
+  timings:
+    needs: [metadata, checks, android-toolchain, android, macos, publish]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - name: Report job and step durations
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api "repos/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID/jobs?per_page=100" | python3 tool/release.py timings >> "$GITHUB_STEP_SUMMARY"

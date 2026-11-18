@@ -4,15 +4,18 @@
 #   python3 tool/release.py metadata
 #   python3 tool/release.py notices
 #   python3 tool/release.py checksums
+#   gh api repos/OWNER/REPO/actions/runs/RUN_ID/jobs | python3 tool/release.py timings
 # Outputs go to build/release; metadata also writes GitHub Actions job outputs.
 
 import argparse
+from datetime import datetime
 import hashlib
 import json
 import os
 from pathlib import Path
 import plistlib
 import re
+import sys
 import zipfile
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -36,7 +39,24 @@ def metadata():
     tag = f'v{version}'
     if os.environ.get('GITHUB_REF_TYPE') == 'tag' and os.environ.get('GITHUB_REF_NAME') != tag:
         raise SystemExit('The release tag does not match pubspec.yaml.')
-    return {'version': version, 'build_number': build_number, 'tag': tag}
+    targets = [
+        {'abi': 'arm64-v8a', 'target': 'android-arm64'},
+        {'abi': 'armeabi-v7a', 'target': 'android-arm'},
+        {'abi': 'x86_64', 'target': 'android-x64'},
+    ]
+    selected = os.environ.get('RELEASE_TARGET', 'all')
+    choices = ['all', 'android', 'macos', *(f'android-{item["abi"]}' for item in targets)]
+    if selected not in choices:
+        raise SystemExit('Unknown release target: ' + selected)
+    android = [item for item in targets if selected in ('all', 'android', f'android-{item["abi"]}')]
+    return {
+        'version': version, 'build_number': build_number, 'tag': tag,
+        'android': str(bool(android)).lower(),
+        'macos': str(selected in ('all', 'macos')).lower(),
+        'publish': str(selected == 'all').lower(),
+        'android_matrix': json.dumps({'include': android}, separators=(',', ':')),
+        'notices_abi': android[0]['abi'] if android else '',
+    }
 
 
 def notices():
@@ -74,9 +94,31 @@ def checksums():
     print(f'Wrote checksums for {len(files)} assets.')
 
 
+def timings():
+    payload = json.load(sys.stdin)
+    print('## Release timings\n')
+    print('| Job / step | Result | Duration |')
+    print('| --- | --- | ---: |')
+    for job in payload['jobs']:
+        if job['name'] == 'timings':
+            continue
+        for item in [job, *job.get('steps', [])]:
+            start, end = item.get('started_at'), item.get('completed_at')
+            if not start or not end:
+                continue
+            seconds = max(0, int((datetime.fromisoformat(end.replace('Z', '+00:00')) -
+                                 datetime.fromisoformat(start.replace('Z', '+00:00'))).total_seconds()))
+            label = item['name'].replace('|', r'\|').replace('\n', ' ')
+            if item is job:
+                label = f'**{label}**'
+            else:
+                label = '↳ ' + label
+            print(f'| {label} | {item.get("conclusion") or "running"} | {seconds // 60}m {seconds % 60}s |')
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('command', choices=['metadata', 'notices', 'checksums'])
+    parser.add_argument('command', choices=['metadata', 'notices', 'checksums', 'timings'])
     command = parser.parse_args().command
     if command == 'metadata':
         values = metadata()
@@ -87,8 +129,10 @@ def main():
         print(json.dumps(values))
     elif command == 'notices':
         notices()
-    else:
+    elif command == 'checksums':
         checksums()
+    else:
+        timings()
 
 
 if __name__ == '__main__':

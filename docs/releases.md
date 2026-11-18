@@ -31,16 +31,39 @@ Enter the name in **Name**, paste the matching value into **Secret**, and select
 
 Commit and push the release configuration using your normal Git workflow. Then either:
 
-1. Open [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml), select **Run workflow**, choose the branch containing the release, and run it. The workflow derives the tag from `pubspec.yaml`, creates that tag at the selected commit when publishing, and publishes the release after all checks and builds succeed.
+1. Open [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml), select **Run workflow**, choose the branch containing the release, leave **target** set to **all**, and run it. The workflow derives the tag from `pubspec.yaml`, creates that tag at the selected commit when publishing, and publishes the release after all checks and builds succeed.
 2. Push the matching version tag, such as `v0.1.1`. This starts the same workflow automatically.
 
 Do not start both methods for the same version. Manual dispatch requires the workflow to be present on the default branch. An existing version tag must identify the selected commit. Published releases are never overwritten; publish a new version for changed packages. A failed draft upload can be retried for the same tag and commit.
 
-The workflow validates version consistency, then runs analysis/tests, Android builds, and the macOS build in parallel. It caches Flutter, Dart packages, Gradle dependencies, and Swift package downloads. First builds still download large SDKs; cache reuse reduces repeated work but does not guarantee a fixed completion time.
+The workflow validates version consistency, then runs analysis/tests, Android toolchain preparation, and the macOS build in parallel. Three independent Android jobs build ARM64, ARMv7, and x86_64 after the shared toolchain is ready. A failed architecture does not cancel the other builds.
+
+For a focused rebuild, use the same [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) and select a **target**:
+
+| Target | Result |
+| --- | --- |
+| `all` | Build every package, run checks, and publish a complete GitHub Release |
+| `android` | Build all three Android architectures; download them from the run's Artifacts |
+| `macos` | Build only the macOS package; download it from the run's Artifacts |
+| `android-arm64-v8a` | Build the ARM64 APK; download it from the run's Artifacts |
+| `android-armeabi-v7a` | Build the ARMv7 APK; download it from the run's Artifacts |
+| `android-x86_64` | Build the x86_64 APK; download it from the run's Artifacts |
+
+Focused rebuilds still run analysis and tests. They do not create or replace a published release. Use **Re-run failed jobs** on a full run when retrying a transient failure without changing the source; workflow changes require a new run on the updated commit.
 
 Only the publish job receives repository write permission. It uploads all packages and checksums to a draft before publishing. If organization or repository policy blocks this permission, review [Actions permissions](https://github.com/CELFS/twist-cast/settings/actions). A personal access token is not required.
 
 After completion, open [Releases](https://github.com/CELFS/twist-cast/releases). Successful platform jobs also retain their packages under the workflow run's **Artifacts** for 14 days, even when another platform fails. Artifacts require a GitHub login; published release assets remain attached to the release.
+
+## Build performance
+
+- Flutter SDK and Dart package caches have one writer per shared key. They are saved immediately after successful preparation, before compilation or packaging can fail. Android jobs restore the Linux cache without competing to save it.
+- A separate job primes the shared Android NDK, CMake, platform, and build-tools cache. Its warm-cache path only checks availability; the architecture jobs restore the cache directly. Versions live in `.github/android-toolchain.json`; the NDK and Android platform versions are checked against the pinned Flutter SDK.
+- Gradle uses its minimal binary distribution with an official SHA-256 checksum. `setup-gradle` restores dependencies and task outputs for each matrix job. Build caching, parallel tasks, four-worker limits, and daemon shutdown are enabled only in CI; configuration caching of signing credentials is not enabled.
+- Android Flutter compilation outputs are cached separately for each architecture. macOS caches Swift packages at Flutter's actual `build/macos/SourcePackages` path and reuses native compilation outputs keyed by Xcode, Flutter, dependencies, and commit. Native outputs are saved after a successful compilation and before packaging checks.
+- Open each job's summary for cache hits. The final **timings** job reports the duration of every job and step, including cache transfers. Compare cold and warm runs separately; cache transfer and parallel-job overhead must be included when evaluating improvements.
+
+First builds still download large SDKs. Cache reuse and parallel builds reduce repeated work, but their actual effect must be measured in cloud runs; no fixed completion time is guaranteed. Compilation runs on GitHub-hosted machines and does not require local builds.
 
 ## Packages and installation
 

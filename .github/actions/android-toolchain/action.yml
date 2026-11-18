@@ -1,0 +1,61 @@
+name: Prepare the shared Android toolchain
+description: Prime or restore the pinned NDK, CMake, Android platform, and build tools.
+inputs:
+  prime:
+    description: Populate the shared toolchain cache before the Android matrix starts.
+    default: 'false'
+outputs:
+  build-tools:
+    description: Path to the configured Android build tools.
+    value: ${{ steps.config.outputs.build-tools }}
+runs:
+  using: composite
+  steps:
+    - id: config
+      shell: bash
+      run: |
+        python3 - <<'PY'
+        import json, os
+        from pathlib import Path
+        config = json.loads(Path('.github/android-toolchain.json').read_text())
+        paths = [f'ndk/{config["ndk"]}', f'cmake/{config["cmake"]}',
+                 f'platforms/android-{config["platform"]}', f'build-tools/{config["build_tools"]}']
+        sdk = Path(os.environ['ANDROID_HOME'])
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+            output.write('paths<<SDK_PATHS\n' + '\n'.join(str(sdk / path) for path in paths) + '\nSDK_PATHS\n')
+            output.write('installed=' + str(all((sdk / path / 'source.properties').is_file() for path in paths)).lower() + '\n')
+            output.write('build-tools=' + str(sdk / 'build-tools' / config['build_tools']) + '\n')
+        PY
+    - id: cache
+      if: inputs.prime == 'true' || steps.config.outputs.installed != 'true'
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.config.outputs.paths }}
+        key: twistcast-android-tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('.github/android-toolchain.json') }}
+        lookup-only: ${{ inputs.prime == 'true' }}
+    - name: Install missing toolchain components
+      if: steps.cache.outputs.cache-hit != 'true' && steps.config.outputs.installed != 'true'
+      shell: bash
+      run: |
+        python3 - <<'PY'
+        import json, os, subprocess
+        from pathlib import Path
+        config = json.loads(Path('.github/android-toolchain.json').read_text())
+        subprocess.run([str(Path(os.environ['ANDROID_HOME']) / 'cmdline-tools/latest/bin/sdkmanager'),
+                        f'ndk;{config["ndk"]}', f'cmake;{config["cmake"]}',
+                        f'platforms;android-{config["platform"]}', f'build-tools;{config["build_tools"]}'], check=True)
+        PY
+    - name: Save the shared toolchain
+      if: inputs.prime == 'true' && steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.config.outputs.paths }}
+        key: ${{ steps.cache.outputs.cache-primary-key }}
+    - name: Report toolchain cache
+      shell: bash
+      env:
+        HIT: ${{ steps.cache.outputs.cache-hit }}
+        INSTALLED: ${{ steps.config.outputs.installed }}
+        PRIME: ${{ inputs.prime }}
+      run: |
+        echo "Android toolchain cache hit: ${HIT:-false}; preinstalled: $INSTALLED; cache writer: $PRIME" >> "$GITHUB_STEP_SUMMARY"

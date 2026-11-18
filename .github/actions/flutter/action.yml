@@ -1,0 +1,68 @@
+name: Prepare Flutter and package caches
+description: Restore shared caches and save them before compilation, with one writer per SDK cache.
+inputs:
+  version:
+    description: Exact Flutter SDK version.
+    required: true
+  platform:
+    description: Platform artifacts to precache (android, macos, or linux).
+    required: true
+  write-cache:
+    description: Whether this job owns writes to the shared SDK and package caches.
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - id: paths
+      uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      with:
+        flutter-version: ${{ inputs.version }}
+        channel: stable
+        dry-run: true
+        cache: false
+    - id: sdk
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.paths.outputs.CACHE-PATH }}
+        key: twistcast-sdk-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}-${{ inputs.platform }}
+    - id: packages
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.paths.outputs.PUB-CACHE-PATH }}
+        key: twistcast-pub-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}-${{ hashFiles('pubspec.lock') }}
+        restore-keys: twistcast-pub-v2-${{ runner.os }}-${{ runner.arch }}-${{ inputs.version }}-
+    - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+      with:
+        flutter-version: ${{ inputs.version }}
+        channel: stable
+        cache: false
+    - name: Prepare platform artifacts
+      if: steps.sdk.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        PLATFORM: ${{ inputs.platform }}
+      run: flutter precache "--$PLATFORM"
+    - name: Save the prepared SDK
+      if: inputs.write-cache == 'true' && steps.sdk.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.paths.outputs.CACHE-PATH }}
+        key: ${{ steps.sdk.outputs.cache-primary-key }}
+    - shell: bash
+      run: flutter pub get --enforce-lockfile
+    - name: Save resolved packages
+      if: inputs.write-cache == 'true' && steps.packages.outputs.cache-hit != 'true'
+      uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+      with:
+        path: ${{ steps.paths.outputs.PUB-CACHE-PATH }}
+        key: ${{ steps.packages.outputs.cache-primary-key }}
+    - shell: bash
+      run: flutter gen-l10n
+    - name: Report cache results
+      shell: bash
+      env:
+        SDK_HIT: ${{ steps.sdk.outputs.cache-hit }}
+        PUB_HIT: ${{ steps.packages.outputs.cache-hit }}
+        WRITER: ${{ inputs.write-cache }}
+      run: |
+        echo "Flutter SDK exact cache hit: ${SDK_HIT:-false}; package exact cache hit: ${PUB_HIT:-false}; cache writer: $WRITER" >> "$GITHUB_STEP_SUMMARY"
