@@ -6,6 +6,29 @@ class MainFlutterWindow: NSWindow {
   private var windowChannel: FlutterMethodChannel?
   private var receiverAccessory: NSTitlebarAccessoryViewController?
   private let minimumContentSize = NSSize(width: 320, height: 360)
+  private var inactiveWindowIndicators: [InactiveWindowIndicator] = []
+
+  override func becomeKey() {
+    super.becomeKey()
+    inactiveWindowIndicators.forEach { $0.isHidden = true }
+  }
+
+  override func resignKey() {
+    super.resignKey()
+    inactiveWindowIndicators.forEach { $0.isHidden = false }
+  }
+
+  private func addInactiveWindowIndicators() {
+    let buttons: [NSWindow.ButtonType] = [.closeButton, .miniaturizeButton, .zoomButton]
+    for type in buttons {
+      guard let button = standardWindowButton(type) else { continue }
+      let indicator = InactiveWindowIndicator(frame: button.bounds)
+      indicator.autoresizingMask = [.width, .height]
+      indicator.isHidden = isKeyWindow
+      button.addSubview(indicator, positioned: .above, relativeTo: nil)
+      inactiveWindowIndicators.append(indicator)
+    }
+  }
 
   @objc private func toggleReceiverControls() {
     windowChannel?.invokeMethod("toggleReceiverControls", arguments: nil)
@@ -106,5 +129,18 @@ class MainFlutterWindow: NSWindow {
       }
 
     super.awakeFromNib()
+    addInactiveWindowIndicators()
+  }
+}
+
+private final class InactiveWindowIndicator: NSView {
+  override func hitTest(_ point: NSPoint) -> NSView? { nil }
+
+  override func draw(_ dirtyRect: NSRect) {
+    let diameter = min(11, bounds.width, bounds.height)
+    let circle = NSRect(x: bounds.midX - diameter / 2, y: bounds.midY - diameter / 2,
+      width: diameter, height: diameter)
+    NSColor(srgbRed: 0.59, green: 0.62, blue: 0.65, alpha: 1).setFill()
+    NSBezierPath(ovalIn: circle).fill()
   }
 }

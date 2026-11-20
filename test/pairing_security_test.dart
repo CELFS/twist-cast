@@ -51,10 +51,16 @@ void main() {
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
     expect(find.text('© · 2026 · CELFS · v0.1.10'), findsOneWidget);
-    expect(tester.getBottomRight(find.byType(AppFooter)).dy, 600);
-    if (!Platform.isMacOS) expect(tester.getTopLeft(find.byType(AppBrand)).dx, 16);
+    if (Platform.isMacOS) {
+      expect(tester.getSize(find.byType(AppFooter)).height, 20);
+    } else {
+      expect(tester.getBottomRight(find.byType(AppFooter)).dy, 600);
+      expect(tester.getTopLeft(find.byType(AppBrand)).dx, 16);
+    }
     expect(find.text('Connected · encrypted screen sharing'), findsNothing);
-    await tester.tap(find.byType(DropdownButton<Locale>));
+    await tester.tap(Platform.isMacOS
+      ? find.byType(PopupMenuButton<Locale>)
+      : find.byType(DropdownButton<Locale>));
     await tester.pumpAndSettle();
     if (Platform.isMacOS || Platform.isAndroid) {
       expect(find.text('Could not check for updates. Please try again.'), findsOneWidget);
@@ -62,9 +68,17 @@ void main() {
     await tester.tap(find.text('简体中文').last);
     await tester.pumpAndSettle();
     expect(find.text('开始接收'), findsOneWidget);
-    tester.view.physicalSize = const Size(320, 600);
+    tester.view.physicalSize = const Size(320, 360);
     await tester.pumpAndSettle();
-    expect(tester.getBottomRight(find.byType(AppFooter)).dy, 600);
+    final footer = find.byType(AppFooter);
+    if (Platform.isMacOS) {
+      expect(tester.getTopLeft(footer).dy, greaterThan(360));
+      await tester.ensureVisible(footer);
+      await tester.pumpAndSettle();
+      expect(tester.getBottomRight(footer).dy, lessThanOrEqualTo(360));
+    } else {
+      expect(tester.getBottomRight(footer).dy, 360);
+    }
     expect(tester.takeException(), isNull);
   });
 

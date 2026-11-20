@@ -14,6 +14,7 @@ import '../updates/update_controller.dart';
 import '../window/mac_window_surface.dart';
 import 'app_brand.dart';
 import 'app_footer.dart';
+import 'language_menu.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({required this.locale, required this.onLocaleChanged, super.key});
@@ -53,12 +54,11 @@ class _HomePageState extends State<HomePage> {
       final active = ![CastPhase.idle, CastPhase.ended, CastPhase.failed].contains(_cast.phase);
       final viewing = _cast.phase == CastPhase.casting && !_cast.sending && _cast.media != null;
       final actions = <Widget>[
-          Padding(padding: const EdgeInsets.only(right: 16), child: DropdownButton<Locale>(
+          Padding(padding: EdgeInsets.only(right: Platform.isMacOS ? 10 : 16),
+            child: Platform.isMacOS
+              ? Center(child: LanguageMenu(locale: widget.locale, onChanged: widget.onLocaleChanged))
+              : DropdownButton<Locale>(
             value: widget.locale, underline: const SizedBox.shrink(),
-            isDense: Platform.isMacOS,
-            style: Platform.isMacOS ? theme.textTheme.labelLarge?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ) : null,
             items: [
               DropdownMenuItem(value: const Locale('en'), child: Text(text.english)),
               DropdownMenuItem(value: const Locale('zh'), child: Text(text.chinese)),
@@ -78,14 +78,17 @@ class _HomePageState extends State<HomePage> {
       return MacWindowSurface(child: Scaffold(
         backgroundColor: Platform.isMacOS ? Colors.transparent : null,
         appBar: Platform.isMacOS ? MacWindowTitleBar(actions: actions) : header,
-        bottomNavigationBar: const AppFooter(),
+        bottomNavigationBar: Platform.isMacOS ? null : const AppFooter(),
         body: SafeArea(bottom: false, child: Padding(
           padding: EdgeInsets.all(Platform.isMacOS ? MacWindowSurface.inset : 0),
           child: Center(child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 960),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(_cast.isMobile ? text.shareTitle : text.receiveTitle, style: theme.textTheme.headlineMedium),
+              Text(_cast.isMobile ? text.shareTitle : text.receiveTitle,
+                style: Platform.isMacOS
+                  ? theme.textTheme.headlineSmall?.copyWith(fontSize: 22)
+                  : theme.textTheme.headlineMedium),
               const SizedBox(height: 8),
               Text(text.tagline, style: theme.textTheme.bodyLarge),
               const SizedBox(height: 24),
@@ -168,7 +171,11 @@ class _HomePageState extends State<HomePage> {
                 UpdateCard(sessionActive: active, onInstallingChanged: (value) {
                   if (mounted) setState(() => _installingUpdate = value);
                 }),
-                const SizedBox(height: 16),
+                if (!Platform.isMacOS) const SizedBox(height: 16),
+              ],
+              if (Platform.isMacOS) ...[
+                const SizedBox(height: 12),
+                const AppFooter(compact: true),
               ],
             ]),
           ),
