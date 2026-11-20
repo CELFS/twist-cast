@@ -50,7 +50,7 @@ void main() {
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.7'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.8'), findsOneWidget);
     expect(tester.getBottomRight(find.byType(AppFooter)).dy, 600);
     expect(tester.getTopLeft(find.byType(AppBrand)).dx, 16);
     expect(find.text('Connected · encrypted screen sharing'), findsNothing);
@@ -202,7 +202,7 @@ void main() {
     const export = MethodChannel('app.twist.cast/diagnostics');
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(updates, (_) async => {
-      'version': '0.1.7', 'buildNumber': 10020, 'targetUrl': 'private-value',
+      'version': '0.1.8', 'buildNumber': 10020, 'targetUrl': 'private-value',
     });
     messenger.setMockMethodCallHandler(export, (call) async {
       final report = jsonDecode((call.arguments as Map)['json'] as String) as Map;

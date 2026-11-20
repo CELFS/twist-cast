@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+  <title>TwistCast</title>
+  <options customize="never" require-scripts="true" hostArchitectures="arm64,x86_64"/>
+  <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>
+  <installation-check script="checkInstalledVersion()"/>
+  <volume-check>
+    <allowed-os-versions><os-version min="12.0"/></allowed-os-versions>
+  </volume-check>
+  <script><![CDATA[
+    function checkInstalledVersion() {
+      var installed = system.files.plistAtPath('/Applications/TwistCast.app/Contents/Info.plist');
+      if (!installed) return true;
+      if (installed.CFBundleIdentifier != 'app.twist.cast') {
+        my.result.type = 'Fatal';
+        my.result.message = system.localizedString('INSTALL_CONFLICT');
+        return false;
+      }
+      if (system.compareVersions(installed.CFBundleShortVersionString, '@VERSION@') > 0 ||
+          system.compareVersions(installed.CFBundleVersion, '@BUILD@') > 0) {
+        my.result.type = 'Fatal';
+        my.result.message = system.localizedString('NEWER_INSTALLED');
+        return false;
+      }
+      return true;
+    }
+  ]]></script>
+  <choices-outline><line choice="twistcast"/></choices-outline>
+  <choice id="twistcast" visible="false"><pkg-ref id="app.twist.cast.installer"/></choice>
+  <pkg-ref id="app.twist.cast.installer" version="@BUILD@" onConclusion="none">TwistCast-component.pkg</pkg-ref>
+  <pkg-ref id="app.twist.cast.installer">
+    <must-close><app id="app.twist.cast"/></must-close>
+  </pkg-ref>
+</installer-gui-script>

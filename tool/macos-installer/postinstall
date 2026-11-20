@@ -1,0 +1,13 @@
+#!/bin/bash
+# Installer callback; packaged by: python3 tool/release.py macos-pkg
+# Launch the installed app in the active user's session, never as root.
+set -eu
+if [ "${3:-/}" != / ]; then exit 0; fi
+console_user=$(/usr/bin/stat -f '%Su' /dev/console)
+console_uid=$(/usr/bin/stat -f '%u' /dev/console)
+if [ "$console_uid" -ge 501 ] && [ "$console_user" != loginwindow ]; then
+  /bin/launchctl asuser "$console_uid" /usr/bin/sudo -u "$console_user" \
+    /usr/bin/open /Applications/TwistCast.app || \
+    echo 'TwistCast was installed. Open it from Applications.'
+fi
+exit 0

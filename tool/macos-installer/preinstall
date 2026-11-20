@@ -1,0 +1,28 @@
+#!/bin/bash
+# Installer callback; packaged by: python3 tool/release.py macos-pkg
+# Recheck the destination before changing files, including command-line installs.
+set -eu
+test "${3:-/}" = / || { echo 'Install TwistCast on the startup disk.'; exit 1; }
+app=/Applications/TwistCast.app
+test ! -L "$app" || { echo 'The installation destination must not be a symbolic link.'; exit 1; }
+if /usr/bin/pgrep -x TwistCast >/dev/null; then
+  echo 'Quit TwistCast before installing the update.'
+  exit 1
+fi
+if [ -e "$app" ]; then
+  plist="$app/Contents/Info.plist"
+  test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$plist")" = app.twist.cast
+  installed_build=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")
+  case "$installed_build" in ''|*[!0-9]*) exit 1 ;; esac
+  test "$installed_build" -le @BUILD@ || { echo 'A newer TwistCast build is already installed.'; exit 1; }
+  installed_version=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")
+  /usr/bin/awk -v installed="$installed_version" -v candidate='@VERSION@' 'BEGIN {
+    if (split(installed, old, ".") != 3) exit 1;
+    split(candidate, nextVersion, ".");
+    for (i = 1; i <= 3; i++) {
+      if (old[i] !~ /^[0-9]+$/) exit 1;
+      if (old[i] + 0 > nextVersion[i] + 0) exit 1;
+      if (old[i] + 0 < nextVersion[i] + 0) exit 0;
+    }
+  }' || { echo 'A newer TwistCast version is already installed.'; exit 1; }
+fi

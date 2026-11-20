@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.8 - Unreleased
+
+- Provide a macOS PKG installer that installs TwistCast in Applications without mounting a disk image or requiring drag-and-drop installation.
+- Check installed versions, require TwistCast to close before replacement, and open the installed application in the active user's session after installation.
+- Verify the application identity and signature inside the finished installer while retaining signed DMG archives for existing Sparkle clients.
+
 ## 0.1.7 - Unreleased
 
 - Retain bounded per-device media diagnostics across session shutdown and export JSON reports through the Android and macOS system save dialogs.

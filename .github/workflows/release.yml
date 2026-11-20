@@ -310,6 +310,8 @@ jobs:
           unzip -q build/release/THIRD_PARTY_NOTICES.zip -d build/dmg/Licenses
           rm build/release/THIRD_PARTY_NOTICES.zip
           hdiutil create -volname TwistCast -srcfolder build/dmg -ov -format UDZO "build/release/twist-cast-$VERSION-macos-universal.dmg"
+      - name: Build and verify the macOS package installer
+        run: python3 tool/release.py macos-pkg
       - name: Sign the macOS update and write its feed
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
@@ -318,6 +320,7 @@ jobs:
         with:
           name: macos-release
           path: |
+            build/release/*.pkg
             build/release/*.dmg
             build/release/appcast.xml
           if-no-files-found: error
@@ -355,6 +358,7 @@ jobs:
         if: steps.release-policy.outputs.publish == 'true'
         run: |
           test -f "build/release/twist-cast-$VERSION-macos-universal.dmg"
+          test -f "build/release/twist-cast-$VERSION-macos-universal.pkg"
           test -f build/release/appcast.xml
           for abi in arm64-v8a armeabi-v7a x86_64; do
             test -f "build/release/twist-cast-$VERSION-android-$abi.apk"
@@ -369,7 +373,7 @@ jobs:
           Native one-to-one phone screen sharing over a local network, with encrypted pairing and optional internal audio.
 
           - Android phones: download `android-arm64-v8a.apk` for most current phones. ARMv7 and x86_64 packages are also provided.
-          - macOS: download `macos-universal.dmg` and drag TwistCast to Applications. Supports Apple Silicon and Intel Macs. This build is ad-hoc signed and is not notarized; macOS may require approval in System Settings > Privacy & Security.
+          - macOS: download `macos-universal.pkg` and follow the installer to install or replace TwistCast in Applications. Quit TwistCast when prompted. Supports Apple Silicon and Intel Macs. The installer is unsigned and the application is ad-hoc signed, without notarization; macOS may require approval in System Settings > Privacy & Security. The DMG is retained for in-app Sparkle updates.
           - Android release packages use a dedicated signing key. An existing debug-signed installation must be uninstalled first; uninstalling removes its local pairing data. Later releases retain the same release key for in-place updates.
           - These are early testing builds. Real-device capture, internal audio, and cross-device operation still need verification.
           - Checksums and third-party notices are included. iOS, Windows, and Linux packages are not included in this release workflow.

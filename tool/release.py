@@ -14,6 +14,7 @@
 #   python3 tool/release.py restore-input-times
 #   python3 tool/release.py update-manifest
 #   python3 tool/release.py appcast
+#   python3 tool/release.py macos-pkg
 # Input timestamps are saved with macOS compilation outputs and restored only for identical files.
 # Outputs go to build/release; metadata also writes GitHub Actions job outputs.
 
@@ -26,6 +27,7 @@ import os
 from pathlib import Path
 import plistlib
 import re
+import shutil
 import subprocess
 import sys
 import zipfile
@@ -212,6 +214,61 @@ def release_policy():
     return {'publish': str(publish).lower(), 'reason': reason}
 
 
+def macos_pkg():
+    values = metadata()
+    app = ROOT / 'build/macos/Build/Products/Release/TwistCast.app'
+    info = plistlib.loads((app / 'Contents/Info.plist').read_bytes())
+    if (info.get('CFBundleIdentifier'), info.get('CFBundleShortVersionString'), info.get('CFBundleVersion')) != (
+            'app.twist.cast', values['version'], values['build_number']):
+        raise SystemExit('macOS application identity does not match the installer.')
+    subprocess.run(['codesign', '--verify', '--deep', '--strict', str(app)], check=True)
+    source = ROOT / 'tool/macos-installer'
+    stage = ROOT / 'build/macos-installer'
+    if stage.exists():
+        shutil.rmtree(stage)
+    payload = stage / 'payload'
+    payload.mkdir(parents=True)
+    subprocess.run(['ditto', str(app), str(payload / 'TwistCast.app')], check=True)
+    components = stage / 'components.plist'
+    subprocess.run(['pkgbuild', '--analyze', '--root', str(payload), str(components)], check=True)
+    bundles = plistlib.loads(components.read_bytes())
+
+    def configure(items):
+        for item in items:
+            item.update(BundleIsRelocatable=False, BundleIsVersionChecked=True,
+                        BundleHasStrictIdentifier=True, BundleOverwriteAction='upgrade')
+            configure(item.get('ChildBundles', []))
+
+    configure(bundles)
+    components.write_bytes(plistlib.dumps(bundles))
+    scripts = stage / 'scripts'
+    scripts.mkdir()
+    for name in ('preinstall', 'postinstall'):
+        path = scripts / name
+        path.write_text((source / name).read_text().replace('@VERSION@', values['version'])
+                        .replace('@BUILD@', values['build_number']))
+        path.chmod(0o755)
+    component = stage / 'TwistCast-component.pkg'
+    subprocess.run(['pkgbuild', '--root', str(payload), '--component-plist', str(components),
+                    '--identifier', 'app.twist.cast.installer', '--version', values['build_number'],
+                    '--install-location', '/Applications', '--scripts', str(scripts), str(component)], check=True)
+    distribution = stage / 'distribution.xml'
+    distribution.write_text((source / 'distribution.xml').read_text().replace('@VERSION@', values['version'])
+                            .replace('@BUILD@', values['build_number']))
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    package = OUTPUT / f'twist-cast-{values["version"]}-macos-universal.pkg'
+    subprocess.run(['productbuild', '--distribution', str(distribution), '--resources', str(source / 'resources'),
+                    '--package-path', str(stage), str(package)], check=True)
+    # Inspect the final archive, not just its staging inputs.
+    expanded = stage / 'expanded'
+    subprocess.run(['pkgutil', '--expand-full', str(package), str(expanded)], check=True)
+    packaged = list(expanded.glob('*/Payload/TwistCast.app/Contents/Info.plist'))
+    if len(packaged) != 1 or plistlib.loads(packaged[0].read_bytes()) != info:
+        raise SystemExit('Packaged macOS application identity does not match the build.')
+    subprocess.run(['codesign', '--verify', '--deep', '--strict', str(packaged[0].parents[1])], check=True)
+    print(package)
+
+
 def appcast():
     values = metadata()
     version, build_number = values['version'], values['build_number']
@@ -321,7 +378,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['metadata', 'release-policy', 'notices', 'checksums', 'timings', 'appcast',
                                           'macos-input-key', 'save-input-times', 'restore-input-times',
-                                          'check-inputs', 'preflight', 'update-manifest'])
+                                          'check-inputs', 'preflight', 'update-manifest', 'macos-pkg'])
     command = parser.parse_args().command
     if command in ('metadata', 'release-policy'):
         values = metadata() if command == 'metadata' else release_policy()
@@ -342,6 +399,8 @@ def main():
         update_manifest()
     elif command == 'appcast':
         appcast()
+    elif command == 'macos-pkg':
+        macos_pkg()
     elif command == 'macos-input-key':
         macos_input_key()
     elif command in ('save-input-times', 'restore-input-times'):
