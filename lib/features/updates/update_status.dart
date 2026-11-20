@@ -19,7 +19,10 @@ class UpdateStatus extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
     final (background, foreground) = switch (tone) {
       UpdateStatusTone.info => (colors.surfaceContainerHighest, colors.onSurfaceVariant),
-      UpdateStatusTone.success => (colors.tertiaryContainer, colors.onTertiaryContainer),
+      UpdateStatusTone.success => (
+        Color.alphaBlend(colors.primary.withValues(alpha: 0.08), colors.surface),
+        colors.onSurfaceVariant,
+      ),
       UpdateStatusTone.error => (colors.errorContainer, colors.onErrorContainer),
     };
     return Semantics(liveRegion: !showProgress, child: Container(
