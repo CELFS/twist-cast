@@ -6,15 +6,17 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import 'receiver_toolbar.dart';
+import 'receiver_pointer.dart';
 import 'receiver_view.dart';
 
 class ReceiverPage extends StatefulWidget {
   const ReceiverPage({required this.renderer, required this.onStop,
-    required this.header, this.diagnostics, super.key});
+    required this.header, this.diagnostics, this.onPointer, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final PreferredSizeWidget header;
   final Widget? diagnostics;
+  final RemotePointer? onPointer;
 
   @override
   State<ReceiverPage> createState() => _ReceiverPageState();
@@ -73,7 +75,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
     appBar: !_nativeControls && _showHeader ? widget.header : null,
     body: SafeArea(child: Stack(children: [
       Positioned.fill(child: ReceiverView(renderer: widget.renderer,
-        onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
+        onPointer: widget.onPointer, onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
         onToggleHeader: () => setState(() => _showHeader = !_showHeader))),
       if (_nativeControls && _showHeader) ...[
         Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.opaque,

@@ -50,7 +50,7 @@ void main() {
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.9'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.10'), findsOneWidget);
     expect(tester.getBottomRight(find.byType(AppFooter)).dy, 600);
     expect(tester.getTopLeft(find.byType(AppBrand)).dx, 16);
     expect(find.text('Connected · encrypted screen sharing'), findsNothing);

@@ -13,7 +13,11 @@ import com.cloudwebrtc.webrtc.PlaybackCapture
 
 /** Keeps the user-approved projection alive while another app is on screen. */
 class CaptureService : Service() {
-    companion object { var ready: (() -> Unit)? = null }
+    companion object {
+        var ready: (() -> Unit)? = null
+        var running = false
+            private set
+    }
     override fun onBind(intent: Intent?): IBinder? = null
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val title = intent?.getStringExtra("title") ?: return START_NOT_STICKY
@@ -28,11 +32,14 @@ class CaptureService : Service() {
             .setSmallIcon(R.mipmap.ic_launcher).setOngoing(true).setContentIntent(open).build()
         if (Build.VERSION.SDK_INT >= 29) startForeground(4201, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
         else startForeground(4201, notification)
+        running = true
         ready?.invoke()
         ready = null
         return START_NOT_STICKY
     }
     override fun onDestroy() {
+        running = false
+        RemoteTouchService.active?.cancelTouch()
         PlaybackCapture.stopProjection()
         super.onDestroy()
     }

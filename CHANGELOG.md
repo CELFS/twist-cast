@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.10 - Unreleased
+
+- Control an Android phone with the desktop mouse after granting accessibility access and enabling control for the session.
+
 ## 0.1.9 - Unreleased
 
 - Include texture timing counters and the unrotated frame fast path in macOS Swift Package builds.

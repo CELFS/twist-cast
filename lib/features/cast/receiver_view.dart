@@ -6,14 +6,16 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import 'receiver_toolbar.dart';
+import 'receiver_pointer.dart';
 
 class ReceiverView extends StatefulWidget {
   const ReceiverView({required this.renderer, required this.onStop,
-    required this.headerVisible, required this.onToggleHeader, this.showControls = true, super.key});
+    required this.headerVisible, required this.onToggleHeader, this.showControls = true, this.onPointer, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool headerVisible;
   final bool showControls;
+  final RemotePointer? onPointer;
   final VoidCallback onToggleHeader;
 
   @override
@@ -82,8 +84,10 @@ class _ReceiverViewState extends State<ReceiverView> {
         ValueListenableBuilder<RTCVideoValue>(valueListenable: widget.renderer, builder: (context, value, _) {
           final viewport = Size(constraints.maxWidth, constraints.maxHeight);
           _fit(value, viewport, MediaQuery.sizeOf(context).height - viewport.height);
-          return ColoredBox(color: Colors.black, child: RTCVideoView(widget.renderer,
-            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain));
+          return ReceiverPointer(videoSize: Size(value.aspectRatio, 1),
+            onPointer: value.width > 0 && value.height > 0 ? widget.onPointer : null,
+            child: ColoredBox(color: Colors.black, child: RTCVideoView(widget.renderer,
+              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain)));
         }),
       )),
     ]);

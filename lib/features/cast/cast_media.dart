@@ -26,6 +26,45 @@ class CastMedia {
   bool _initialized = false;
   bool _sending = false;
   bool _reportedPlaying = false;
+  bool _peerSupportsTouch = false;
+  bool remoteTouchEnabled = false;
+  bool get canSendPointer => !_closed && !_sending && _reportedPlaying && remoteTouchEnabled;
+  bool get canEnableRemoteTouch => Platform.isAndroid && _sending && _peerSupportsTouch && _reportedPlaying && !_closed;
+
+  Future<bool> setRemoteTouch(bool enabled) async {
+    if (!canEnableRemoteTouch) return false;
+    if (enabled && await _native.invokeMethod<bool>('remoteTouchAvailable') != true) {
+      if (!_closed) await _native.invokeMethod<void>('remoteTouchSettings');
+      return false;
+    }
+    if (_closed) return false;
+    remoteTouchEnabled = enabled;
+    if (!enabled) await _native.invokeMethod<void>('remoteTouchCancel');
+    if (!_closed) send({'type': 'touch-state', 'enabled': enabled});
+    return enabled;
+  }
+
+  void sendPointer(String action, Offset point, Offset scroll, bool landscape) {
+    if (!canSendPointer) return;
+    send({'type': 'pointer', 'action': action, 'x': point.dx, 'y': point.dy,
+      'dx': scroll.dx.clamp(-0.35, 0.35), 'dy': scroll.dy.clamp(-0.35, 0.35),
+      'landscape': landscape});
+  }
+
+  Future<void> _receivePointer(Map<String, dynamic> message) async {
+    if (!canEnableRemoteTouch || !remoteTouchEnabled) return;
+    final action = message['action'];
+    if (!const {'down', 'move', 'up', 'cancel', 'scroll'}.contains(action)) return;
+    final args = <String, dynamic>{'action': action, 'landscape': message['landscape'] == true};
+    for (final field in ['x', 'y', 'dx', 'dy']) {
+      final value = message[field];
+      if (value is! num || !value.isFinite) return;
+      final axis = field == 'x' || field == 'y';
+      if (value < (axis ? 0 : -0.35) || value > (axis ? 1 : 0.35)) return;
+      args[field] = value.toDouble();
+    }
+    await _native.invokeMethod<void>('remotePointer', args);
+  }
 
   Future<void> prepare() async {
     await WebRTC.initialize(options: {
@@ -125,7 +164,7 @@ class CastMedia {
     }
     final offer = await _peer!.createOffer();
     await _peer!.setLocalDescription(offer);
-    if (!_closed) send({'type': 'offer', 'sdp': offer.sdp});
+    if (!_closed) send({'type': 'offer', 'sdp': offer.sdp, if (Platform.isAndroid) 'touch': true});
   }
 
   Future<bool> _audioPermission() async =>
@@ -168,6 +207,12 @@ class CastMedia {
   Future<void> handle(Map<String, dynamic> message) async {
     if (_closed || _peer == null) return;
     switch (message['type']) {
+      case 'touch-state':
+        if (_sending || !_peerSupportsTouch || !_reportedPlaying) return;
+        remoteTouchEnabled = message['enabled'] == true;
+        onConnected();
+      case 'pointer':
+        await _receivePointer(message);
       case 'playing':
         if (!_sending || _reportedPlaying) throw const FormatException('Unexpected playback acknowledgment');
         _reportedPlaying = true;
@@ -182,12 +227,13 @@ class CastMedia {
         if (sdp is! String || sdp.length > 100000) throw const FormatException('Invalid SDP');
         await _peer!.setRemoteDescription(RTCSessionDescription(sdp, message['type'] as String));
         _remoteDescription = true;
+        _peerSupportsTouch = message['touch'] == true;
         for (final candidate in _pendingIce) { await _peer!.addCandidate(candidate); }
         _pendingIce.clear();
         if (!_sending) {
           final answer = await _peer!.createAnswer();
           await _peer!.setLocalDescription(answer);
-          send({'type': 'answer', 'sdp': answer.sdp});
+          send({'type': 'answer', 'sdp': answer.sdp, if (_peerSupportsTouch) 'touch': true});
         }
       case 'ice':
         final candidate = message['candidate'];

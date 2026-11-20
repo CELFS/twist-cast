@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:bonsoir/bonsoir.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:nanoid/nanoid.dart';
 
 import '../../core/device_identity.dart';
@@ -174,6 +175,23 @@ class CastController extends ChangeNotifier {
     approved = true;
     notifyListeners();
     try { await _session?.approve(); } catch (_) { await stop(failed: true); }
+  }
+
+  bool remoteTouchBusy = false;
+
+  Future<void> setRemoteTouch(bool enabled) async {
+    final transport = media;
+    if (remoteTouchBusy || transport == null || phase != CastPhase.casting) return;
+    remoteTouchBusy = true;
+    notifyListeners();
+    try {
+      await transport.setRemoteTouch(enabled);
+    } on PlatformException {
+      // A missing or disabled system service leaves remote touch off.
+    } finally {
+      remoteTouchBusy = false;
+      if (!_disposed) notifyListeners();
+    }
   }
 
   Future<void> setAudio(bool value) async {

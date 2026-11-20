@@ -158,7 +158,8 @@ class SecureSession {
     } else if (type == 'approve' && _transcript != null && !_remoteApproved) {
       _remoteApproved = true;
       await _authorize();
-    } else if (_authorized && (type == 'offer' || type == 'answer' || type == 'ice' || type == 'playing' || type == 'stop')) {
+    } else if (_authorized && (type == 'offer' || type == 'answer' || type == 'ice' || type == 'playing' ||
+        type == 'touch-state' || type == 'pointer' || type == 'stop')) {
       if (type == 'stop') { await close(); } else { await onMessage(data); }
     } else {
       throw const FormatException('Unexpected message');

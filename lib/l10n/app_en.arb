@@ -48,7 +48,7 @@
   "sessionEnded": "Session ended. Your screen is no longer shared.",
   "notificationTitle": "TwistCast screen sharing",
   "notificationBody": "Your screen is being shared. Tap to return and stop.",
-  "versionLabel": "TwistCast 0.1.9",
+  "versionLabel": "TwistCast 0.1.10",
   "updateCheck": "Check for updates",
   "updateInstalled": "Current version",
   "updateLatest": "Latest version",
@@ -63,7 +63,7 @@
   "updateDownloadFailed": "Could not download the update. Please try again.",
   "updateInstallFailed": "Could not install the update. Check installation permissions and try again.",
   "updateStopSession": "Stop screen sharing before updating.",
-  "footerLabel": "© · 2026 · CELFS · v0.1.9",
+  "footerLabel": "© · 2026 · CELFS · v0.1.10",
   "resizeWindowFailed": "Could not resize the window automatically.",
   "showHeader": "Show title and language",
   "hideHeader": "Hide title and language",
@@ -78,5 +78,7 @@
   "diagnosticsExport": "Save report",
   "diagnosticsMarked": "Issue marked in this device’s report.",
   "diagnosticsSaved": "Report saved.",
-  "diagnosticsFailed": "Could not save the report. Try again."
+  "diagnosticsFailed": "Could not save the report. Try again.",
+  "remoteTouch": "Allow mouse control",
+  "remoteTouchHint": "Enable TwistCast in Android accessibility settings, then turn on this switch for the current session."
 }

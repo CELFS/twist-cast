@@ -60,7 +60,9 @@ class _HomePageState extends State<HomePage> {
           )),
         ]);
       if (viewing) {
-        return ReceiverPage(renderer: _cast.media!.renderer,
+        final media = _cast.media!;
+        return ReceiverPage(renderer: media.renderer,
+          onPointer: media.canSendPointer ? media.sendPointer : null,
           onStop: _cast.stop, header: header,
           diagnostics: _cast.diagnostics == null ? null : DiagnosticsCard(log: _cast.diagnostics!));
       }
@@ -131,6 +133,12 @@ class _HomePageState extends State<HomePage> {
               if (_cast.phase == CastPhase.casting) ...[
                 _Notice(text: text.secureSession, icon: Icons.lock_outline),
                 if (_cast.sending) Padding(padding: const EdgeInsets.all(24), child: Text(text.sharingHint)),
+              ],
+              if (_cast.media?.canEnableRemoteTouch == true) ...[
+                const SizedBox(height: 16),
+                SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(text.remoteTouch),
+                  subtitle: Text(text.remoteTouchHint), value: _cast.media!.remoteTouchEnabled,
+                  onChanged: _cast.remoteTouchBusy ? null : _cast.setRemoteTouch),
               ],
               if (_cast.isMobile) ...[
                 const SizedBox(height: 16),

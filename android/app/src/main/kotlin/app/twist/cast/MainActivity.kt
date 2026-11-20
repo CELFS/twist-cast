@@ -65,6 +65,24 @@ class MainActivity : FlutterActivity() {
                             result.error("audio", "Internal audio capture failed", null)
                         }
                     }
+                    "remoteTouchAvailable" -> result.success(RemoteTouchService.supported && RemoteTouchService.active != null)
+                    "remoteTouchSettings" -> {
+                        startActivity(Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        result.success(null)
+                    }
+                    "remoteTouchCancel" -> {
+                        RemoteTouchService.active?.cancelTouch()
+                        result.success(null)
+                    }
+                    "remotePointer" -> {
+                        if (CaptureService.running) RemoteTouchService.active?.pointer(
+                            call.argument<String>("action") ?: "",
+                            call.argument<Double>("x") ?: 0.0, call.argument<Double>("y") ?: 0.0,
+                            call.argument<Double>("dx") ?: 0.0, call.argument<Double>("dy") ?: 0.0,
+                            call.argument<Boolean>("landscape") == true
+                        )
+                        result.success(null)
+                    }
                     "stop" -> {
                         PlaybackCapture.stopProjection()
                         stopService(Intent(this, CaptureService::class.java))
