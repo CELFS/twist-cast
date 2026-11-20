@@ -89,11 +89,20 @@ class _ReceiverViewState extends State<ReceiverView> {
         ValueListenableBuilder<RTCVideoValue>(valueListenable: widget.renderer, builder: (context, value, _) {
           final viewport = Size(constraints.maxWidth, constraints.maxHeight);
           _fit(value, viewport, MediaQuery.sizeOf(context).height - viewport.height);
+          final hasFrameSize = value.width > 0 && value.height > 0;
+          final video = RTCVideoView(widget.renderer,
+            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain);
           return ReceiverPointer(videoSize: Size(value.aspectRatio, 1),
-            onPointer: value.width > 0 && value.height > 0 ? widget.onPointer : null,
-            child: ColoredBox(color: Platform.isMacOS ? Colors.transparent : Colors.black,
-              child: RTCVideoView(widget.renderer,
-              objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain)));
+            onPointer: hasFrameSize ? widget.onPointer : null,
+            child: Platform.isMacOS && hasFrameSize
+              ? Center(child: AspectRatio(
+                  aspectRatio: value.aspectRatio,
+                  child: ClipRRect(
+                    borderRadius: const BorderRadius.all(Radius.circular(6)),
+                    child: video,
+                  ),
+                ))
+              : ColoredBox(color: Platform.isMacOS ? Colors.transparent : Colors.black, child: video));
         }),
       )),
     ]);

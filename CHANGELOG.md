@@ -3,6 +3,7 @@
 ## 0.1.13 - Unreleased
 
 - Turn desktop trackpad pans into continuous Android touch gestures and add Back, Home, and Recent apps controls to the receiver.
+- Improve the receiver tools icon contrast, lighten inactive macOS window controls, and round the shared screen corners.
 
 ## 0.1.12 - Unreleased
 

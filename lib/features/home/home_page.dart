@@ -69,8 +69,7 @@ class _HomePageState extends State<HomePage> {
         ];
       final compactHeader = Platform.isMacOS && viewing;
       final header = AppBar(
-        title: const AppBrand(),
-        titleTextStyle: compactHeader ? theme.textTheme.titleMedium : null,
+        title: AppBrand(showName: !compactHeader),
         toolbarHeight: compactHeader ? 44 : null,
         centerTitle: false,
         titleSpacing: 16,

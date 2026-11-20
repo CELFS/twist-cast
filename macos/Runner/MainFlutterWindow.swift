@@ -44,6 +44,7 @@ class MainFlutterWindow: NSWindow {
         button.imagePosition = .imageOnly
         button.bezelStyle = .texturedRounded
         button.isBordered = false
+        button.contentTintColor = NSColor(srgbRed: 0.26, green: 0.32, blue: 0.37, alpha: 1)
         button.target = self
         button.action = #selector(toggleReceiverControls)
         accessory.view = button
@@ -140,7 +141,7 @@ private final class InactiveWindowIndicator: NSView {
     let diameter = min(11, bounds.width, bounds.height)
     let circle = NSRect(x: bounds.midX - diameter / 2, y: bounds.midY - diameter / 2,
       width: diameter, height: diameter)
-    NSColor(srgbRed: 0.59, green: 0.62, blue: 0.65, alpha: 1).setFill()
+    NSColor(srgbRed: 0.67, green: 0.70, blue: 0.73, alpha: 1).setFill()
     NSBezierPath(ovalIn: circle).fill()
   }
 }
