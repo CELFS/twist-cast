@@ -8,12 +8,14 @@ import '../../l10n/generated/app_localizations.dart';
 import 'receiver_toolbar.dart';
 import 'receiver_pointer.dart';
 import 'receiver_view.dart';
+import 'display_power.dart';
 
 class ReceiverPage extends StatefulWidget {
   const ReceiverPage({required this.renderer, required this.onStop,
-    required this.header, this.diagnostics, this.onPointer, super.key});
+    required this.header, this.diagnostics, this.onPointer, this.canSetDisplayPower = false, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
+  final bool canSetDisplayPower;
   final PreferredSizeWidget header;
   final Widget? diagnostics;
   final RemotePointer? onPointer;
@@ -24,6 +26,7 @@ class ReceiverPage extends StatefulWidget {
 
 class _ReceiverPageState extends State<ReceiverPage> {
   static const _window = MethodChannel('app.twist.cast/window');
+  final _displayPower = DisplayPower();
   bool _showHeader = false;
   bool _nativeControls = false;
   String? _controlsLabel;
@@ -63,6 +66,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
 
   @override
   void dispose() {
+    _displayPower.dispose();
     if (Platform.isMacOS) {
       _window.setMethodCallHandler(null);
       _window.invokeMethod<void>('receiverControls', {'enabled': false}).catchError((Object _) {});
@@ -76,6 +80,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
     body: SafeArea(child: Stack(children: [
       Positioned.fill(child: ReceiverView(renderer: widget.renderer,
         onPointer: widget.onPointer, onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
+        extraControl: widget.canSetDisplayPower ? DisplayPowerButton(power: _displayPower) : null,
         onToggleHeader: () => setState(() => _showHeader = !_showHeader))),
       if (_nativeControls && _showHeader) ...[
         Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.opaque,
@@ -90,6 +95,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
               children: [
                 SizedBox(height: widget.header.preferredSize.height, child: widget.header),
                 ReceiverToolbar(onStop: widget.onStop, headerVisible: true,
+                  extraControl: widget.canSetDisplayPower ? DisplayPowerButton(power: _displayPower) : null,
                   onToggleHeader: () => setState(() => _showHeader = false)),
                 if (widget.diagnostics != null) widget.diagnostics!,
               ],

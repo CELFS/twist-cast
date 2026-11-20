@@ -3,6 +3,7 @@
 ## 0.1.10 - Unreleased
 
 - Control an Android phone with the desktop mouse after granting accessibility access and enabling control for the session.
+- Turn off and restore a compatible Android phone's physical display from the receiver through authorized ADB while sharing.
 
 ## 0.1.9 - Unreleased
 

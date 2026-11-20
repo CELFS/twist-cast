@@ -64,6 +64,7 @@ class _HomePageState extends State<HomePage> {
         return ReceiverPage(renderer: media.renderer,
           onPointer: media.canSendPointer ? media.sendPointer : null,
           onStop: _cast.stop, header: header,
+          canSetDisplayPower: media.canSetDisplayPower,
           diagnostics: _cast.diagnostics == null ? null : DiagnosticsCard(log: _cast.diagnostics!));
       }
       return Scaffold(

@@ -4,11 +4,12 @@ import '../../l10n/generated/app_localizations.dart';
 
 class ReceiverToolbar extends StatelessWidget {
   const ReceiverToolbar({required this.onStop, required this.onToggleHeader,
-    required this.headerVisible, this.resizeFailed = false, super.key});
+    required this.headerVisible, this.resizeFailed = false, this.extraControl, super.key});
   final VoidCallback onStop;
   final VoidCallback onToggleHeader;
   final bool headerVisible;
   final bool resizeFailed;
+  final Widget? extraControl;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +24,7 @@ class ReceiverToolbar extends StatelessWidget {
               size: 18, color: Theme.of(context).colorScheme.error)),
           ],
           const Spacer(),
+          ?extraControl,
           IconButton(onPressed: onToggleHeader,
             tooltip: headerVisible ? text.hideHeader : text.showHeader,
             icon: Icon(headerVisible ? Icons.expand_less : Icons.expand_more)),

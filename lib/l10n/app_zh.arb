@@ -35,5 +35,9 @@
   "notificationBody": "正在共享屏幕，点击返回应用可停止共享。",
   "versionLabel": "TwistCast 0.1.10",
   "remoteTouch": "允许鼠标控制",
-  "remoteTouchHint": "先在 Android 无障碍设置中启用 TwistCast，再打开此开关授权当前投屏。"
+  "remoteTouchHint": "先在 Android 无障碍设置中启用 TwistCast，再打开此开关授权当前投屏。",
+  "displayPowerOff": "关闭手机屏幕",
+  "displayPowerOn": "恢复手机屏幕",
+  "displayPowerDevice": "选择正在投屏的 Android 手机",
+  "displayPowerFailed": "无法切换手机屏幕。请检查 ADB 连接及手机系统是否支持息屏控制。"
 }

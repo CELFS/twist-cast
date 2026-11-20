@@ -167,6 +167,8 @@ class CastMedia {
     if (!_closed) send({'type': 'offer', 'sdp': offer.sdp, if (Platform.isAndroid) 'touch': true});
   }
 
+  bool get canSetDisplayPower => !_closed && !_sending && _reportedPlaying && _peerSupportsTouch;
+
   Future<bool> _audioPermission() async =>
       await _native.invokeMethod<bool>('audioPermission') == true;
 

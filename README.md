@@ -49,6 +49,12 @@ Guest Wi-Fi, access-point isolation, VPN routing, and host firewalls can prevent
 
 On Android 8.0 or later, enable **Allow mouse control** on the phone once sharing starts. Enable TwistCast in Android accessibility settings when prompted, then return to TwistCast and enable the switch for this session. Use the desktop mouse to tap, press and hold, drag, or scroll within the shared screen. Mouse control turns off when the session ends.
 
+### Turn off the phone display
+
+On compatible Android 15 or newer devices, connect the phone to the desktop using authorized USB or wireless debugging. Start the local Android Platform Tools server with `adb start-server` and verify the phone appears as `device` in `adb devices`. While receiving an Android screen, open the receiver controls, select **Turn off phone display**, and choose the ADB serial of the phone that is sharing. This turns off the physical display without sending the lock or power key. **Restore phone display** returns display power to Android. The receiver also attempts to restore it when sharing ends. If ADB is disconnected, use the phone's power button to wake the display.
+
+Android's sleep timeout still applies. Some devices may stop projection when they go to sleep or lack the display power commands required by this feature.
+
 ## Privacy and pairing
 
 - Device signing keys and TLS private keys are stored through the operating system's secure-storage facility. Storage failure prevents connection.

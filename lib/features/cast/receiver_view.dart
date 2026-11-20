@@ -10,12 +10,13 @@ import 'receiver_pointer.dart';
 
 class ReceiverView extends StatefulWidget {
   const ReceiverView({required this.renderer, required this.onStop,
-    required this.headerVisible, required this.onToggleHeader, this.showControls = true, this.onPointer, super.key});
+    required this.headerVisible, required this.onToggleHeader, this.showControls = true, this.onPointer, this.extraControl, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool headerVisible;
   final bool showControls;
   final RemotePointer? onPointer;
+  final Widget? extraControl;
   final VoidCallback onToggleHeader;
 
   @override
@@ -79,7 +80,7 @@ class _ReceiverViewState extends State<ReceiverView> {
     return Column(children: [
       if (widget.showControls) ReceiverToolbar(onStop: widget.onStop,
         onToggleHeader: widget.onToggleHeader, headerVisible: widget.headerVisible,
-        resizeFailed: _resizeFailed),
+        resizeFailed: _resizeFailed, extraControl: widget.extraControl),
       Expanded(child: LayoutBuilder(builder: (context, constraints) =>
         ValueListenableBuilder<RTCVideoValue>(valueListenable: widget.renderer, builder: (context, value, _) {
           final viewport = Size(constraints.maxWidth, constraints.maxHeight);

@@ -80,5 +80,9 @@
   "diagnosticsSaved": "Report saved.",
   "diagnosticsFailed": "Could not save the report. Try again.",
   "remoteTouch": "Allow mouse control",
-  "remoteTouchHint": "Enable TwistCast in Android accessibility settings, then turn on this switch for the current session."
+  "remoteTouchHint": "Enable TwistCast in Android accessibility settings, then turn on this switch for the current session.",
+  "displayPowerOff": "Turn off phone display",
+  "displayPowerOn": "Restore phone display",
+  "displayPowerDevice": "Select the Android phone you are sharing",
+  "displayPowerFailed": "Display power could not be changed. Check the ADB connection and Android display power support."
 }
