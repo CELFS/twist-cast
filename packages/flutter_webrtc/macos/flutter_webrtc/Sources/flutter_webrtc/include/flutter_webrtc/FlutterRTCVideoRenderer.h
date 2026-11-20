@@ -20,6 +20,7 @@
                               messenger:(NSObject<FlutterBinaryMessenger>*)messenger;
 
 - (void)dispose;
+- (NSDictionary*)diagnosticSnapshot;
 
 @end
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.9 - Unreleased
+
+- Include texture timing counters and the unrotated frame fast path in macOS Swift Package builds.
+- Pause Android audio packet transmission when device audio is off while keeping the in-session audio toggle available.
+
 ## 0.1.8 - Unreleased
 
 - Provide a macOS PKG installer that installs TwistCast in Applications without mounting a disk image or requiring drag-and-drop installation.

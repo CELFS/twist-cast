@@ -18,6 +18,7 @@ class CastMedia {
   RTCPeerConnection? _peer;
   CastDiagnostics? _diagnostics;
   MediaStream? _stream;
+  RTCRtpSender? _androidAudioSender;
   StreamSubscription<dynamic>? _events;
   final _pendingIce = <RTCIceCandidate>[];
   bool _remoteDescription = false;
@@ -109,6 +110,10 @@ class CastMedia {
     await setAudio(audio);
     for (final track in stream.getTracks()) {
       final sender = await _peer!.addTrack(track, stream);
+      if (Platform.isAndroid && track.kind == 'audio') {
+        _androidAudioSender = sender;
+        await _setAndroidAudioTransmission(audio);
+      }
       if (Platform.isAndroid && track.kind == 'video') {
         // Adapt resolution under encoder pressure instead of sacrificing motion.
         final parameters = sender.parameters;
@@ -126,6 +131,25 @@ class CastMedia {
   Future<bool> _audioPermission() async =>
       await _native.invokeMethod<bool>('audioPermission') == true;
 
+  Future<void> _setAndroidAudioTransmission(bool enabled) async {
+    final sender = _androidAudioSender;
+    if (sender == null) return;
+    final parameters = sender.parameters;
+    final encodings = parameters.encodings;
+    if (encodings == null || encodings.isEmpty) {
+      throw StateError('Audio sender has no RTP encoding');
+    }
+    if (encodings.every((encoding) => encoding.active == enabled)) return;
+    // A disabled track still sends silence. Pause its RTP encoding while keeping
+    // the audio sender negotiated so the user can enable audio mid-session.
+    for (final encoding in encodings) {
+      encoding.active = enabled;
+    }
+    if (!await sender.setParameters(parameters)) {
+      throw StateError('Could not configure audio transmission');
+    }
+  }
+
   Future<void> setAudio(bool enabled) async {
     if (!_sending || _closed) return;
     if (enabled && _stream?.getAudioTracks().isEmpty == true) {
@@ -134,6 +158,7 @@ class CastMedia {
     if (Platform.isAndroid) {
       if (enabled && !await _audioPermission()) throw StateError('Audio permission denied');
       await _native.invokeMethod<void>('audio', {'enabled': enabled});
+      await _setAndroidAudioTransmission(enabled);
     }
     for (final track in _stream?.getAudioTracks() ?? <MediaStreamTrack>[]) {
       track.enabled = enabled;

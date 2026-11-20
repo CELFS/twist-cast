@@ -20,6 +20,8 @@
   bool _isFirstFrameRendered;
   bool _frameAvailable;
   os_unfair_lock _lock;
+  uint64_t _receivedFrames, _submittedFrames, _consumedFrames, _pendingDrops;
+  double _conversionSeconds, _handoffSeconds, _submittedAt;
 }
 
 @synthesize textureId = _textureId;
@@ -56,10 +58,23 @@
   os_unfair_lock_lock(&_lock);
   if (_pixelBufferRef != nil && _frameAvailable) {
     buffer = CVBufferRetain(_pixelBufferRef);
+    _consumedFrames++;
+    _handoffSeconds += NSProcessInfo.processInfo.systemUptime - _submittedAt;
     _frameAvailable = false;
   }
   os_unfair_lock_unlock(&_lock);
   return buffer;
+}
+
+// Texture consumption is a raster handoff, not physical display presentation.
+- (NSDictionary*)diagnosticSnapshot {
+  os_unfair_lock_lock(&_lock);
+  NSDictionary* metrics = @{@"receivedFrames": @(_receivedFrames),
+    @"submittedFrames": @(_submittedFrames), @"consumedFrames": @(_consumedFrames),
+    @"pendingDrops": @(_pendingDrops), @"conversionSeconds": @(_conversionSeconds),
+    @"handoffSeconds": @(_handoffSeconds)};
+  os_unfair_lock_unlock(&_lock);
+  return metrics;
 }
 
 - (void)dispose {
@@ -97,6 +112,11 @@
 
 - (id<RTCI420Buffer>)correctRotation:(const id<RTCI420Buffer>)src
                         withRotation:(RTCVideoRotation)rotation {
+  // Unrotated frames already have the required layout; avoid allocating and
+  // copying a full-resolution I420 frame before the pixel-format conversion.
+  if (rotation == RTCVideoRotation_0) {
+    return src;
+  }
   int rotated_width = src.width;
   int rotated_height = src.height;
 
@@ -200,8 +220,14 @@
     os_unfair_lock_unlock(&_lock);
     return;
   }
+  _receivedFrames++;
+  if (_frameAvailable) _pendingDrops++;
   if(!_frameAvailable && _pixelBufferRef) {
+    double began = NSProcessInfo.processInfo.systemUptime;
     [self copyI420ToCVPixelBuffer:_pixelBufferRef withFrame:frame];
+    _submittedAt = NSProcessInfo.processInfo.systemUptime;
+    _conversionSeconds += _submittedAt - began;
+    _submittedFrames++;
     if(_textureId != -1) {
       [_registry textureFrameAvailable:_textureId];
     }

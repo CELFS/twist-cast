@@ -1059,6 +1059,10 @@ static void FlutterWebRTCApplyFieldTrials(void) {
                                                             messenger:_messenger];
     self.renders[@(render.textureId)] = render;
     result(@{@"textureId" : @(render.textureId)});
+  } else if ([@"videoRendererDiagnostics" isEqualToString:call.method]) {
+    NSDictionary* argsMap = call.arguments;
+    FlutterRTCVideoRenderer* render = self.renders[argsMap[@"textureId"]];
+    result(render ? [render diagnosticSnapshot] : @{});
   } else if ([@"videoRendererDispose" isEqualToString:call.method]) {
     NSDictionary* argsMap = call.arguments;
     NSNumber* textureId = argsMap[@"textureId"];
