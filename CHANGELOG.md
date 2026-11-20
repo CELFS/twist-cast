@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.12 - Unreleased
+
+- Prefer the latest Android update over an older downloaded package and remove the APK after installation succeeds.
+- Simplify update version details and give progress, success, and error messages distinct styles.
+
 ## 0.1.11 - Unreleased
 
 - Store the macOS build revision in the application bundle so changes to the revision do not invalidate the Dart build cache.

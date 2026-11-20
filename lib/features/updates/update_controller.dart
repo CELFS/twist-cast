@@ -12,7 +12,8 @@ class AppRelease {
   final String sha256;
   final int build;
   final String commit;
-  String get label => 'v$version${build > 0 ? "+$build" : ""}${commit.isNotEmpty ? " (${commit.substring(0, 7)})" : ""}';
+  String get numberLabel => UpdateController.versionLabel(version, build);
+  String get label => '$numberLabel${commit.length >= 7 ? " (${commit.substring(0, 7)})" : ""}';
 }
 
 class UpdateController extends ChangeNotifier {
@@ -32,7 +33,12 @@ class UpdateController extends ChangeNotifier {
   String get phase => state['phase'] as String? ?? 'idle';
   bool get busy => working || phase == 'downloading' || phase == 'updating';
   int get installedBuild => (state['buildNumber'] as num?)?.toInt() ?? 0;
-  String get installedLabel => 'v$installed${installedBuild > 0 ? "+$installedBuild" : ""}${installedCommit.length >= 7 ? " (${installedCommit.substring(0, 7)})" : ""}';
+  String get installedNumberLabel => versionLabel(installed, installedBuild);
+  String get _targetVersion => state['targetVersion'] as String? ?? '';
+  int get _targetBuild => (state['targetBuild'] as num?)?.toInt() ?? 0;
+  String get downloadedNumberLabel => versionLabel(_targetVersion, _targetBuild);
+
+  static String versionLabel(String version, int build) => 'v$version${build > 0 ? "+$build" : ""}';
   static const _compiledCommit = String.fromEnvironment('TWISTCAST_COMMIT');
   String get installedCommit {
     final commit = state['commit'];
@@ -40,6 +46,13 @@ class UpdateController extends ChangeNotifier {
   }
   bool get available => release != null && installed.isNotEmpty &&
     isNewerBuild(release!.version, release!.build, installed, installedBuild);
+
+  bool get canInstallDownloaded => phase == 'ready' && !hasNewerDownload;
+  bool get hasNewerDownload {
+    final latest = release;
+    return phase == 'ready' && _targetVersion.isNotEmpty && latest != null && available &&
+      isNewerBuild(latest.version, latest.build, _targetVersion, _targetBuild);
+  }
 
   static bool isNewerBuild(String version, int build, String installed, int installedBuild) {
     final comparison = compareVersions(version, installed);
@@ -181,7 +194,7 @@ class UpdateController extends ChangeNotifier {
   }
 
   Future<void> install(String failureMessage) async {
-    if (busy || phase != 'ready') return;
+    if (busy || checking || !canInstallDownloaded) return;
     await _operate('install', {'failureMessage': failureMessage});
   }
 

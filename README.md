@@ -6,13 +6,13 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.11 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
+TwistCast 0.1.12 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
 
 During a session, the receiver places its controls above the shared screen and hides setup guidance. Desktop windows fit the incoming screen aspect ratio, including orientation changes, while the picture remains fully visible. The application header includes the TwistCast icon, and the copyright and version stay at the bottom of the window.
 
 ## Platform status
 
-| Platform | Role in 0.1.11 | Implementation |
+| Platform | Role in 0.1.12 | Implementation |
 | --- | --- | --- |
 | Android | Share the full phone screen and internal audio | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the full phone screen and internal audio | ReplayKit broadcast extension and App Group socket |
@@ -28,7 +28,7 @@ Android internal audio requires Android 10 or newer. Apps may prohibit capture o
 
 Android and macOS check published GitHub Releases when the application opens. The update card shows the installed and latest versions and supports a manual refresh. Same-version workflow artifacts are not offered as updates. Checking and downloading require access to GitHub.
 
-On Android, download progress remains visible in the update card. After downloading, select **Install update** and allow installation from TwistCast when Android asks. The package checksum, application identifier, version code, and signing certificate are verified before the system installer opens. Use release-signed installations for in-place updates.
+On Android, download progress remains visible in the update card. If a newer release is available, select **Download latest** to replace an earlier downloaded package. After downloading, select **Install update** and allow installation from TwistCast when Android asks. The app removes the downloaded APK after a successful update and retains it if you cancel installation. The package checksum, application identifier, version code, and signing certificate are verified before the system installer opens. Use release-signed installations for in-place updates.
 
 On macOS, select **Update and restart** and follow the Sparkle update window to download, install, and relaunch. The application sandbox remains enabled, and update archives are verified with the application's public signing key. Stop screen sharing before starting an update.
 
@@ -137,7 +137,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.11`; the local development build number is `12`. CI assigns increasing build numbers independently for published updates.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.12`; the local development build number is `13`. CI assigns increasing build numbers independently for published updates.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -145,7 +145,7 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.11 shares the entire phone screen with one desktop receiver. Clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
+0.1.12 shares the entire phone screen with one desktop receiver. Clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
 
 ## License
 

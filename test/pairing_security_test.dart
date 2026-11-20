@@ -38,6 +38,29 @@ void main() {
     expect(release.label, 'v0.1.5+10015');
   });
 
+  test('a newer Android release replaces a downloaded update without installing it first', () {
+    final controller = UpdateController();
+    addTearDown(controller.dispose);
+    controller.state = {
+      'version': '0.1.8', 'buildNumber': 10018, 'phase': 'ready',
+      'targetVersion': '0.1.9', 'targetBuild': 10019,
+    };
+    controller.release = const AppRelease('0.1.10', '', '', build: 10020);
+    expect(controller.hasNewerDownload, isTrue);
+    expect(controller.canInstallDownloaded, isFalse);
+
+    controller.release = const AppRelease('0.1.9', '', '', build: 10020);
+    expect(controller.hasNewerDownload, isTrue);
+    expect(controller.canInstallDownloaded, isFalse);
+
+    controller.release = const AppRelease('0.1.9', '', '', build: 10019);
+    expect(controller.hasNewerDownload, isFalse);
+    expect(controller.canInstallDownloaded, isTrue);
+
+    controller.release = null;
+    expect(controller.canInstallDownloaded, isTrue);
+  });
+
   testWidgets('desktop starts offline, fits a compact window and switches language', (tester) async {
     const updates = MethodChannel('app.twist.cast/updates');
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
@@ -50,7 +73,7 @@ void main() {
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.11'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.12'), findsOneWidget);
     if (Platform.isMacOS) {
       expect(tester.getSize(find.byType(AppFooter)).height, 20);
     } else {
@@ -63,7 +86,7 @@ void main() {
       : find.byType(DropdownButton<Locale>));
     await tester.pumpAndSettle();
     if (Platform.isMacOS || Platform.isAndroid) {
-      expect(find.text('Could not check for updates. Please try again.'), findsOneWidget);
+      expect(find.text('Check failed. Try again.'), findsOneWidget);
     }
     await tester.tap(find.text('简体中文').last);
     await tester.pumpAndSettle();
