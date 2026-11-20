@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:material_ui/material_ui.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -9,6 +11,7 @@ import '../pairing/pairing_card.dart';
 import '../pairing/scanner_page.dart';
 import '../updates/update_card.dart';
 import '../updates/update_controller.dart';
+import '../window/mac_window_surface.dart';
 import 'app_brand.dart';
 import 'app_footer.dart';
 
@@ -49,16 +52,21 @@ class _HomePageState extends State<HomePage> {
     return ListenableBuilder(listenable: _cast, builder: (context, _) {
       final active = ![CastPhase.idle, CastPhase.ended, CastPhase.failed].contains(_cast.phase);
       final viewing = _cast.phase == CastPhase.casting && !_cast.sending && _cast.media != null;
-      final header = AppBar(title: const AppBrand(), centerTitle: false, titleSpacing: 16, actions: [
+      final actions = <Widget>[
           Padding(padding: const EdgeInsets.only(right: 16), child: DropdownButton<Locale>(
             value: widget.locale, underline: const SizedBox.shrink(),
+            isDense: Platform.isMacOS,
+            style: Platform.isMacOS ? theme.textTheme.labelLarge?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ) : null,
             items: [
               DropdownMenuItem(value: const Locale('en'), child: Text(text.english)),
               DropdownMenuItem(value: const Locale('zh'), child: Text(text.chinese)),
             ],
             onChanged: (value) { if (value != null) widget.onLocaleChanged(value); },
           )),
-        ]);
+        ];
+      final header = AppBar(title: const AppBrand(), centerTitle: false, titleSpacing: 16, actions: actions);
       if (viewing) {
         final media = _cast.media!;
         return ReceiverPage(renderer: media.renderer,
@@ -67,10 +75,13 @@ class _HomePageState extends State<HomePage> {
           canSetDisplayPower: media.canSetDisplayPower,
           diagnostics: _cast.diagnostics == null ? null : DiagnosticsCard(log: _cast.diagnostics!));
       }
-      return Scaffold(
-        appBar: header,
+      return MacWindowSurface(child: Scaffold(
+        backgroundColor: Platform.isMacOS ? Colors.transparent : null,
+        appBar: Platform.isMacOS ? MacWindowTitleBar(actions: actions) : header,
         bottomNavigationBar: const AppFooter(),
-        body: SafeArea(bottom: false, child: Center(child: SingleChildScrollView(
+        body: SafeArea(bottom: false, child: Padding(
+          padding: EdgeInsets.all(Platform.isMacOS ? MacWindowSurface.inset : 0),
+          child: Center(child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 960),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
@@ -161,8 +172,8 @@ class _HomePageState extends State<HomePage> {
               ],
             ]),
           ),
-        ))),
-      );
+        )))),
+      ));
     });
   }
 }

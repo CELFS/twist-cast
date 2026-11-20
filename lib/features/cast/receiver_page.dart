@@ -5,6 +5,7 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../l10n/generated/app_localizations.dart';
+import '../window/mac_window_surface.dart';
 import 'receiver_toolbar.dart';
 import 'receiver_pointer.dart';
 import 'receiver_view.dart';
@@ -75,14 +76,19 @@ class _ReceiverPageState extends State<ReceiverPage> {
   }
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-    appBar: !_nativeControls && _showHeader ? widget.header : null,
-    body: SafeArea(child: Stack(children: [
+  Widget build(BuildContext context) => MacWindowSurface(child: Scaffold(
+    backgroundColor: Platform.isMacOS ? Colors.transparent : null,
+    appBar: Platform.isMacOS
+        ? const MacWindowTitleBar()
+        : !_nativeControls && _showHeader ? widget.header : null,
+    body: SafeArea(child: Padding(
+      padding: EdgeInsets.all(Platform.isMacOS ? MacWindowSurface.inset : 0),
+      child: Stack(children: [
       Positioned.fill(child: ReceiverView(renderer: widget.renderer,
         onPointer: widget.onPointer, onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
         extraControl: widget.canSetDisplayPower ? DisplayPowerButton(power: _displayPower) : null,
         onToggleHeader: () => setState(() => _showHeader = !_showHeader))),
-      if (_nativeControls && _showHeader) ...[
+      if (Platform.isMacOS && _showHeader) ...[
         Positioned.fill(child: GestureDetector(behavior: HitTestBehavior.opaque,
           onTap: () => setState(() => _showHeader = false))),
         Align(alignment: Alignment.topRight, child: Padding(
@@ -103,6 +109,6 @@ class _ReceiverPageState extends State<ReceiverPage> {
           ),
         )),
       ],
-    ])),
-  );
+    ]))),
+  ));
 }

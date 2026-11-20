@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../window/mac_window_surface.dart';
 import 'receiver_toolbar.dart';
 import 'receiver_pointer.dart';
 
@@ -64,6 +65,7 @@ class _ReceiverViewState extends State<ReceiverView> {
           'chromeHeight': chromeHeight,
           'preferredArea': viewport.width * viewport.height,
           'minimumWidth': 320.0,
+          if (Platform.isMacOS) 'horizontalInset': MacWindowSurface.inset * 2,
         }).timeout(const Duration(seconds: 3));
         if (mounted && _resizeFailed) setState(() => _resizeFailed = false);
       } catch (_) {
@@ -87,7 +89,8 @@ class _ReceiverViewState extends State<ReceiverView> {
           _fit(value, viewport, MediaQuery.sizeOf(context).height - viewport.height);
           return ReceiverPointer(videoSize: Size(value.aspectRatio, 1),
             onPointer: value.width > 0 && value.height > 0 ? widget.onPointer : null,
-            child: ColoredBox(color: Colors.black, child: RTCVideoView(widget.renderer,
+            child: ColoredBox(color: Platform.isMacOS ? Colors.transparent : Colors.black,
+              child: RTCVideoView(widget.renderer,
               objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain)));
         }),
       )),
