@@ -22,7 +22,7 @@ class DiagnosticLog {
   }
 
   String encode({String? commit}) => jsonEncode({
-    'schema': 1, 'version': '0.1.12',
+    'schema': 1, 'version': '0.1.13',
     'commit': commit ?? const String.fromEnvironment('TWISTCAST_COMMIT'),
     'role': role, 'platform': Platform.operatingSystem,
     'startedUtc': started.toIso8601String(), 'discardedRecords': discarded,

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.13 - Unreleased
+
+- Turn desktop trackpad pans into continuous Android touch gestures and add Back, Home, and Recent apps controls to the receiver.
+
 ## 0.1.12 - Unreleased
 
 - Prefer the latest Android update over an older downloaded package and remove the APK after installation succeeds.

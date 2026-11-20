@@ -7,6 +7,8 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'cast_diagnostics.dart';
 import 'diagnostic_log.dart';
 
+enum RemoteNavigation { back, home, recents }
+
 class CastMedia {
   CastMedia({required this.send, required this.onStopped, required this.onConnected, required this.log});
   final DiagnosticLog log;
@@ -27,6 +29,7 @@ class CastMedia {
   bool _sending = false;
   bool _reportedPlaying = false;
   bool _peerSupportsTouch = false;
+  bool _peerSupportsNavigation = false;
   bool remoteTouchEnabled = false;
   bool get canSendPointer => !_closed && !_sending && _reportedPlaying && remoteTouchEnabled;
   bool get canEnableRemoteTouch => Platform.isAndroid && _sending && _peerSupportsTouch && _reportedPlaying && !_closed;
@@ -51,9 +54,20 @@ class CastMedia {
       'landscape': landscape});
   }
 
+  bool get canSendNavigation => canSendPointer && _peerSupportsNavigation;
+
+  void sendNavigation(RemoteNavigation action) {
+    if (!canSendNavigation) return;
+    send({'type': 'pointer', 'action': action.name});
+  }
+
   Future<void> _receivePointer(Map<String, dynamic> message) async {
     if (!canEnableRemoteTouch || !remoteTouchEnabled) return;
     final action = message['action'];
+    if (RemoteNavigation.values.any((entry) => entry.name == action)) {
+      await _native.invokeMethod<void>('remotePointer', {'action': action});
+      return;
+    }
     if (!const {'down', 'move', 'up', 'cancel', 'scroll'}.contains(action)) return;
     final args = <String, dynamic>{'action': action, 'landscape': message['landscape'] == true};
     for (final field in ['x', 'y', 'dx', 'dy']) {
@@ -164,7 +178,10 @@ class CastMedia {
     }
     final offer = await _peer!.createOffer();
     await _peer!.setLocalDescription(offer);
-    if (!_closed) send({'type': 'offer', 'sdp': offer.sdp, if (Platform.isAndroid) 'touch': true});
+    if (!_closed) {
+      send({'type': 'offer', 'sdp': offer.sdp,
+        if (Platform.isAndroid) ...{'touch': true, 'navigation': true}});
+    }
   }
 
   bool get canSetDisplayPower => !_closed && !_sending && _reportedPlaying && _peerSupportsTouch;
@@ -230,6 +247,7 @@ class CastMedia {
         await _peer!.setRemoteDescription(RTCSessionDescription(sdp, message['type'] as String));
         _remoteDescription = true;
         _peerSupportsTouch = message['touch'] == true;
+        _peerSupportsNavigation = !_sending && message['navigation'] == true;
         for (final candidate in _pendingIce) { await _peer!.addCandidate(candidate); }
         _pendingIce.clear();
         if (!_sending) {

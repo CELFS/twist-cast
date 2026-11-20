@@ -13,12 +13,13 @@ import 'display_power.dart';
 
 class ReceiverPage extends StatefulWidget {
   const ReceiverPage({required this.renderer, required this.onStop,
-    required this.header, this.diagnostics, this.onPointer, this.canSetDisplayPower = false, super.key});
+    required this.header, this.diagnostics, this.onPointer, this.navigation, this.canSetDisplayPower = false, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool canSetDisplayPower;
   final PreferredSizeWidget header;
   final Widget? diagnostics;
+  final Widget? navigation;
   final RemotePointer? onPointer;
 
   @override
@@ -85,7 +86,9 @@ class _ReceiverPageState extends State<ReceiverPage> {
       padding: EdgeInsets.all(Platform.isMacOS ? MacWindowSurface.inset : 0),
       child: Stack(children: [
       Positioned.fill(child: ReceiverView(renderer: widget.renderer,
-        onPointer: widget.onPointer, onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
+        onPointer: Platform.isMacOS && _showHeader ? null : widget.onPointer,
+        onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
+        navigation: widget.navigation,
         extraControl: widget.canSetDisplayPower ? DisplayPowerButton(power: _displayPower) : null,
         onToggleHeader: () => setState(() => _showHeader = !_showHeader))),
       if (Platform.isMacOS && _showHeader) ...[
@@ -103,6 +106,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
                 ReceiverToolbar(onStop: widget.onStop, headerVisible: true,
                   extraControl: widget.canSetDisplayPower ? DisplayPowerButton(power: _displayPower) : null,
                   onToggleHeader: () => setState(() => _showHeader = false)),
+                ?widget.navigation,
                 if (widget.diagnostics != null) widget.diagnostics!,
               ],
             )))),

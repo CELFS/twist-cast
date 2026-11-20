@@ -60,6 +60,17 @@ class RemoteTouchService : AccessibilityService() {
             cancelTouch()
             return
         }
+        val navigation = when (action) {
+            "back" -> GLOBAL_ACTION_BACK
+            "home" -> GLOBAL_ACTION_HOME
+            "recents" -> GLOBAL_ACTION_RECENTS
+            else -> null
+        }
+        if (navigation != null) {
+            cancelTouch()
+            performGlobalAction(navigation)
+            return
+        }
         val display = getSystemService(WindowManager::class.java).defaultDisplay
         val size = android.graphics.Point()
         display.getRealSize(size)

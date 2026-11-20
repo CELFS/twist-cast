@@ -48,7 +48,7 @@
   "sessionEnded": "Session ended. Your screen is no longer shared.",
   "notificationTitle": "TwistCast screen sharing",
   "notificationBody": "Your screen is being shared. Tap to return and stop.",
-  "versionLabel": "TwistCast 0.1.12",
+  "versionLabel": "TwistCast 0.1.13",
   "updateCheck": "Check for updates",
   "updateInstalled": "Installed",
   "updateLatest": "Latest",
@@ -63,7 +63,7 @@
   "updateDownloadFailed": "Download failed. Try again.",
   "updateInstallFailed": "Install failed. Check permissions.",
   "updateStopSession": "Stop sharing to update.",
-  "footerLabel": "© · 2026 · CELFS · v0.1.12",
+  "footerLabel": "© · 2026 · CELFS · v0.1.13",
   "resizeWindowFailed": "Could not resize the window automatically.",
   "showHeader": "Show title and language",
   "hideHeader": "Hide title and language",
@@ -85,5 +85,8 @@
   "displayPowerOn": "Restore phone display",
   "displayPowerDevice": "Select the Android phone you are sharing",
   "displayPowerFailed": "Display power could not be changed. Check the ADB connection and Android display power support.",
-  "updateDownloadLatest": "Download latest"
+  "updateDownloadLatest": "Download latest",
+  "remoteBack": "Back",
+  "remoteHome": "Home",
+  "remoteRecents": "Recent apps"
 }

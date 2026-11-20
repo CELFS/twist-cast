@@ -4,10 +4,12 @@ import 'dart:convert';
 import 'package:twist_cast/features/cast/diagnostic_log.dart';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:twist_cast/features/cast/receiver_page.dart';
+import 'package:twist_cast/features/cast/receiver_pointer.dart';
 import 'package:twist_cast/features/cast/cast_diagnostics.dart';
 import 'package:twist_cast/features/home/app_brand.dart';
 import 'package:twist_cast/features/home/app_footer.dart';
@@ -73,7 +75,7 @@ void main() {
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.12'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.13'), findsOneWidget);
     if (Platform.isMacOS) {
       expect(tester.getSize(find.byType(AppFooter)).height, 20);
     } else {
@@ -103,6 +105,37 @@ void main() {
       expect(tester.getBottomRight(footer).dy, 360);
     }
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('trackpad pans send one continuous swipe from the shared image', (tester) async {
+    final events = <(String, Offset)>[];
+    await tester.pumpWidget(MaterialApp(home: Center(child: SizedBox(
+      width: 300,
+      height: 200,
+      child: ReceiverPointer(videoSize: const Size(1, 1),
+        onPointer: (action, point, _, _) => events.add((action, point)),
+        child: const SizedBox.expand()),
+    ))));
+    final center = tester.getCenter(find.byType(ReceiverPointer));
+    final outside = center - const Offset(125, 0);
+    final ignored = await tester.startGesture(outside, kind: PointerDeviceKind.trackpad);
+    await ignored.panZoomUpdate(outside, pan: const Offset(0, -40));
+    await ignored.panZoomEnd();
+    expect(events, isEmpty);
+
+    final swipe = await tester.startGesture(center, kind: PointerDeviceKind.trackpad);
+    await swipe.panZoomUpdate(center, pan: const Offset(0, -1));
+    expect(events, isEmpty);
+    await swipe.panZoomUpdate(center, pan: const Offset(0, -20),
+      timeStamp: const Duration(milliseconds: 40));
+    await swipe.panZoomUpdate(center, pan: const Offset(0, -40),
+      timeStamp: const Duration(milliseconds: 50));
+    await swipe.panZoomEnd();
+    expect(events, [
+      ('down', const Offset(0.5, 0.5)),
+      ('move', const Offset(0.5, 0.4)),
+      ('up', const Offset(0.5, 0.3)),
+    ]);
   });
 
   testWidgets('receiver resizes once per settled screen ratio and keeps controls above video', (tester) async {

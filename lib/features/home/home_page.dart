@@ -7,6 +7,7 @@ import '../../l10n/generated/app_localizations.dart';
 import '../cast/cast_controller.dart';
 import '../cast/diagnostics_card.dart';
 import '../cast/receiver_page.dart';
+import '../cast/receiver_navigation.dart';
 import '../pairing/pairing_card.dart';
 import '../pairing/scanner_page.dart';
 import '../updates/update_card.dart';
@@ -79,6 +80,7 @@ class _HomePageState extends State<HomePage> {
         final media = _cast.media!;
         return ReceiverPage(renderer: media.renderer,
           onPointer: media.canSendPointer ? media.sendPointer : null,
+          navigation: media.canSendNavigation ? ReceiverNavigation(onNavigate: media.sendNavigation) : null,
           onStop: _cast.stop, header: header,
           canSetDisplayPower: media.canSetDisplayPower,
           diagnostics: _cast.diagnostics == null ? null : DiagnosticsCard(log: _cast.diagnostics!));
