@@ -33,7 +33,11 @@ class UpdateController extends ChangeNotifier {
   bool get busy => working || phase == 'downloading' || phase == 'updating';
   int get installedBuild => (state['buildNumber'] as num?)?.toInt() ?? 0;
   String get installedLabel => 'v$installed${installedBuild > 0 ? "+$installedBuild" : ""}${installedCommit.length >= 7 ? " (${installedCommit.substring(0, 7)})" : ""}';
-  static const installedCommit = String.fromEnvironment('TWISTCAST_COMMIT');
+  static const _compiledCommit = String.fromEnvironment('TWISTCAST_COMMIT');
+  String get installedCommit {
+    final commit = state['commit'];
+    return commit is String && commit.length >= 7 ? commit : _compiledCommit;
+  }
   bool get available => release != null && installed.isNotEmpty &&
     isNewerBuild(release!.version, release!.build, installed, installedBuild);
 

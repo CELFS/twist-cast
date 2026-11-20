@@ -19,6 +19,7 @@ final class AppUpdates: NSObject, SPUUpdaterDelegate {
         "platform": "macos-universal",
         "version": Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "",
         "buildNumber": Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "") ?? 0,
+        "commit": Bundle.main.object(forInfoDictionaryKey: "TwistCastBuildCommit") as? String ?? "",
         "phase": controller.updater.sessionInProgress ? "updating" : failed ? "failed" : "idle",
         "received": 0, "total": 0
       ])

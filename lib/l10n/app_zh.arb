@@ -33,7 +33,7 @@
   "sessionEnded": "会话已结束，屏幕不再共享。",
   "notificationTitle": "TwistCast 屏幕共享",
   "notificationBody": "正在共享屏幕，点击返回应用可停止共享。",
-  "versionLabel": "TwistCast 0.1.10",
+  "versionLabel": "TwistCast 0.1.11",
   "remoteTouch": "允许鼠标控制",
   "remoteTouchHint": "先在 Android 无障碍设置中启用 TwistCast，再打开此开关授权当前投屏。",
   "displayPowerOff": "关闭手机屏幕",

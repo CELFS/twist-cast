@@ -50,7 +50,7 @@ void main() {
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.10'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.11'), findsOneWidget);
     if (Platform.isMacOS) {
       expect(tester.getSize(find.byType(AppFooter)).height, 20);
     } else {
@@ -218,11 +218,12 @@ void main() {
     const export = MethodChannel('app.twist.cast/diagnostics');
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(updates, (_) async => {
-      'version': '0.1.8', 'buildNumber': 10020, 'targetUrl': 'private-value',
+      'version': '0.1.8', 'buildNumber': 10020, 'commit': 'abcdef0123456789', 'targetUrl': 'private-value',
     });
     messenger.setMockMethodCallHandler(export, (call) async {
       final report = jsonDecode((call.arguments as Map)['json'] as String) as Map;
       expect(report.toString(), isNot(contains('private-value')));
+      expect(report['commit'], 'abcdef0123456789');
       expect((report['records'] as List).last['installedBuild'], 10020);
       return false;
     });

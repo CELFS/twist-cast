@@ -21,9 +21,9 @@ class DiagnosticLog {
     _records.add({'elapsedMs': _clock.elapsedMilliseconds, ...metrics});
   }
 
-  String encode() => jsonEncode({
-    'schema': 1, 'version': '0.1.10',
-    'commit': const String.fromEnvironment('TWISTCAST_COMMIT'),
+  String encode({String? commit}) => jsonEncode({
+    'schema': 1, 'version': '0.1.11',
+    'commit': commit ?? const String.fromEnvironment('TWISTCAST_COMMIT'),
     'role': role, 'platform': Platform.operatingSystem,
     'startedUtc': started.toIso8601String(), 'discardedRecords': discarded,
     'clock': 'local monotonic milliseconds; not synchronized between devices',
@@ -31,14 +31,17 @@ class DiagnosticLog {
   });
 
   Future<bool> export() async {
+    String? commit;
     try {
       final status = await const MethodChannel('app.twist.cast/updates')
           .invokeMapMethod<String, dynamic>('status').timeout(const Duration(seconds: 3));
+      final nativeCommit = status?['commit'];
+      if (nativeCommit is String && nativeCommit.isNotEmpty) commit = nativeCommit;
       add({'event': 'build-identity',
         if (status?['version'] is String) 'installedVersion': status!['version'] as String,
         if (status?['buildNumber'] is num) 'installedBuild': status!['buildNumber'] as num});
     } catch (_) { event('build-identity-unavailable'); }
     return await const MethodChannel('app.twist.cast/diagnostics')
-        .invokeMethod<bool>('export', {'json': encode()}) ?? false;
+        .invokeMethod<bool>('export', {'json': encode(commit: commit)}) ?? false;
   }
 }

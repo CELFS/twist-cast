@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.11 - Unreleased
+
+- Store the macOS build revision in the application bundle so changes to the revision do not invalidate the Dart build cache.
+
 ## 0.1.10 - Unreleased
 
 - Control an Android phone with the desktop mouse after granting accessibility access and enabling control for the session.

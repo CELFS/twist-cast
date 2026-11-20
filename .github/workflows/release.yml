@@ -271,7 +271,10 @@ jobs:
         run: python3 tool/release.py restore-input-times
       - name: Compile macOS application
         id: build
-        run: flutter build macos --release --build-number "${{ needs.metadata.outputs.build_number }}" --dart-define="TWISTCAST_COMMIT=$GITHUB_SHA" --no-pub
+        env:
+          # Keep the revision in the signed bundle without changing Dart's build configuration.
+          FLUTTER_XCODE_TWISTCAST_COMMIT: ${{ github.sha }}
+        run: flutter build macos --release --build-number "${{ needs.metadata.outputs.build_number }}" --no-pub
       - name: Save resolved Swift packages
         if: ${{ !cancelled() && steps.build.outcome != 'skipped' && steps.swift-cache.outcome == 'success' && steps.swift-cache.outputs.cache-hit != 'true' }}
         uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
@@ -303,6 +306,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$VERSION"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$app/Contents/Info.plist")" = "${{ needs.metadata.outputs.build_number }}"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :TwistCastBuildCommit' "$app/Contents/Info.plist")" = "$GITHUB_SHA"
           mkdir -p build/dmg build/release
           ditto "$app" build/dmg/TwistCast.app
           ln -s /Applications build/dmg/Applications
