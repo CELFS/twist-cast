@@ -29,14 +29,15 @@ class MacWindowSurface extends StatelessWidget {
 }
 
 class MacWindowTitleBar extends StatelessWidget implements PreferredSizeWidget {
-  const MacWindowTitleBar({this.actions = const [], super.key});
+  const MacWindowTitleBar({this.actions = const [], super.key}) : _height = 38;
+  const MacWindowTitleBar.receiver({super.key}) : actions = const [], _height = 22;
 
   static const _window = MethodChannel('app.twist.cast/window');
-  static const _height = 38.0;
+  final double _height;
   final List<Widget> actions;
 
   @override
-  Size get preferredSize => const Size.fromHeight(_height);
+  Size get preferredSize => Size.fromHeight(_height);
 
   @override
   Widget build(BuildContext context) => AppBar(

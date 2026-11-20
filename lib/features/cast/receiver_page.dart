@@ -79,7 +79,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
   Widget build(BuildContext context) => MacWindowSurface(child: Scaffold(
     backgroundColor: Platform.isMacOS ? Colors.transparent : null,
     appBar: Platform.isMacOS
-        ? const MacWindowTitleBar()
+        ? const MacWindowTitleBar.receiver()
         : !_nativeControls && _showHeader ? widget.header : null,
     body: SafeArea(child: Padding(
       padding: EdgeInsets.all(Platform.isMacOS ? MacWindowSurface.inset : 0),

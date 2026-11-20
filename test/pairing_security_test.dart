@@ -104,21 +104,21 @@ void main() {
     expect(calls, hasLength(1));
     expect(calls.single.arguments['aspectRatio'], closeTo(0.45, 0.001));
     final mac = Platform.isMacOS;
-    expect(calls.single.arguments['chromeHeight'], mac ? 98 : 48);
+    expect(calls.single.arguments['chromeHeight'], mac ? 82 : 48);
     expect(find.byType(AppBrand), findsNothing);
     expect(find.byType(AppFooter), findsNothing);
     await tester.tap(find.byTooltip('Show title and language'));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(calls, hasLength(mac ? 1 : 2));
-    expect(calls.last.arguments['chromeHeight'], mac ? 98 : 104);
+    expect(calls.last.arguments['chromeHeight'], mac ? 82 : 104);
     expect(find.byType(AppBrand), findsOneWidget);
     expect(find.byType(AppFooter), findsNothing);
     await tester.tap(find.byTooltip('Hide title and language').last);
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     expect(calls, hasLength(mac ? 1 : 3));
-    expect(calls.last.arguments['chromeHeight'], mac ? 98 : 48);
+    expect(calls.last.arguments['chromeHeight'], mac ? 82 : 48);
     expect(find.byType(AppBrand), findsNothing);
     expect(tester.getBottomRight(find.text('Stop')).dy,
       lessThan(tester.getTopLeft(find.byType(RTCVideoView)).dy));
@@ -158,7 +158,7 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 200));
     final fits = calls.where((call) => call.method == 'fitVideo').toList();
-    expect(fits.last.arguments['chromeHeight'], 50);
+    expect(fits.last.arguments['chromeHeight'], 34);
     expect(fits.last.arguments['horizontalInset'], 12);
     expect(find.text('Stop'), findsNothing);
     expect(find.byType(AppBrand), findsNothing);

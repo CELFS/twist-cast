@@ -66,7 +66,15 @@ class _HomePageState extends State<HomePage> {
             onChanged: (value) { if (value != null) widget.onLocaleChanged(value); },
           )),
         ];
-      final header = AppBar(title: const AppBrand(), centerTitle: false, titleSpacing: 16, actions: actions);
+      final compactHeader = Platform.isMacOS && viewing;
+      final header = AppBar(
+        title: const AppBrand(),
+        titleTextStyle: compactHeader ? theme.textTheme.titleMedium : null,
+        toolbarHeight: compactHeader ? 44 : null,
+        centerTitle: false,
+        titleSpacing: 16,
+        actions: actions,
+      );
       if (viewing) {
         final media = _cast.media!;
         return ReceiverPage(renderer: media.renderer,

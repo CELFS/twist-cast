@@ -3,6 +3,7 @@
 ## 0.1.11 - Unreleased
 
 - Store the macOS build revision in the application bundle so changes to the revision do not invalidate the Dart build cache.
+- Reduce the gap above the shared screen and compact the receiver panel title on macOS.
 
 ## 0.1.10 - Unreleased
 
