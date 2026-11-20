@@ -89,9 +89,11 @@ class _HomePageState extends State<HomePage> {
         appBar: Platform.isMacOS ? MacWindowTitleBar(actions: actions) : header,
         bottomNavigationBar: Platform.isMacOS ? null : const AppFooter(),
         body: SafeArea(bottom: false, child: Padding(
-          padding: EdgeInsets.all(Platform.isMacOS ? MacWindowSurface.inset : 0),
+          padding: EdgeInsets.symmetric(vertical: Platform.isMacOS ? MacWindowSurface.inset : 0),
           child: Center(child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: Platform.isMacOS
+            ? const EdgeInsets.symmetric(horizontal: MacWindowSurface.inset, vertical: 24)
+            : const EdgeInsets.all(24),
           child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 960),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
               Text(_cast.isMobile ? text.shareTitle : text.receiveTitle,
