@@ -1,5 +1,6 @@
 #include "my_application.h"
 #include "window_sizing.h"
+#include "file_dialogs.h"
 
 #include <flutter_linux/flutter_linux.h>
 
@@ -59,6 +60,7 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   RegisterWindowSizing(view, window);
+  RegisterFileDialogs(view, window);
   RegisterDesktopInput(view);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));

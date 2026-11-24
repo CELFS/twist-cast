@@ -12,8 +12,11 @@ import 'recent_device.dart';
 class SecureSession {
   SecureSession({required this.identity, required this.onPairing,
     required this.onAuthorized, required this.onMessage, required this.onClosed,
-    this.onRecentDevice, this.expectedDevice});
+    this.onRecentDevice, this.expectedDevice, this.filesOnly = false});
   final DeviceIdentity identity;
+  final bool filesOnly;
+  int get _version => filesOnly ? 2 : 1;
+  String get _protocol => filesOnly ? 'twistcast.files.v1' : 'twistcast.v1';
   final String? expectedDevice;
   final Future<void> Function(RecentDevice)? onRecentDevice;
   bool _exchangeProfiles = false;
@@ -86,7 +89,7 @@ class SecureSession {
       _challenge = _secret();
       _serverPin = identity.fingerprint;
       _attach();
-      _send({'type': 'challenge', 'v': 1, 'nonce': _challenge, if (onRecentDevice != null) 'recent': true});
+      _send({'type': 'challenge', 'v': _version, 'nonce': _challenge, if (onRecentDevice != null) 'recent': true});
     } catch (_) {
       await close();
     }
@@ -150,13 +153,13 @@ class SecureSession {
   Future<void> _handle(Map<String, dynamic> data) async {
     final type = data['type'];
     if (type == 'challenge' && !_receiver && _transcript == null) {
-      if (data['v'] != 1) throw const FormatException('Version mismatch');
+      if (data['v'] != _version) throw const FormatException('Version mismatch');
       _exchangeProfiles = onRecentDevice != null && data['recent'] == true;
       if (expectedDevice != null && !_exchangeProfiles) throw const FormatException('Device identity unavailable');
       final challenge = _field(data, 'nonce', 64);
       final nonce = _secret();
       final key = await identity.publicKey;
-      _transcript = jsonEncode(['twistcast.v1', _serverPin, challenge, nonce, key]);
+      _transcript = jsonEncode([_protocol, _serverPin, challenge, nonce, key]);
       _peer = _serverPin;
       _send({'type': 'hello', 'nonce': nonce, 'key': key,
         'signature': await identity.sign(_transcript!), 'token': _token, if (_exchangeProfiles) 'recent': true});
@@ -164,7 +167,7 @@ class SecureSession {
       final nonce = _field(data, 'nonce', 64);
       final key = _field(data, 'key', 64);
       if (base64Decode(key).length != 32) throw const FormatException('Invalid key');
-      _transcript = jsonEncode(['twistcast.v1', _serverPin, _challenge, nonce, key]);
+      _transcript = jsonEncode([_protocol, _serverPin, _challenge, nonce, key]);
       if (!await DeviceIdentity.verify(key, _transcript!, _field(data, 'signature', 128))) {
         throw const FormatException('Invalid signature');
       }
@@ -198,7 +201,9 @@ class SecureSession {
       _receivedProfile = true;
       final device = RecentDevice.parse(_verifiedKey!, data);
       if (device != null) await onRecentDevice!(device);
-    } else if (_authorized && (type == 'offer' || type == 'answer' || type == 'ice' || type == 'playing' ||
+    } else if (_authorized && filesOnly && type is String && type.startsWith('file-')) {
+      await onMessage(data);
+    } else if (_authorized && !filesOnly && (type == 'offer' || type == 'answer' || type == 'ice' || type == 'playing' ||
         type == 'touch-state' || type == 'pointer' || type == 'paste' || type == 'paste-result' || type == 'stop')) {
       if (type == 'stop') { await close(); } else { await onMessage(data); }
     } else {

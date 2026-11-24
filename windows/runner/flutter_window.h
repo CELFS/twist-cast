@@ -30,6 +30,7 @@ class FlutterWindow : public Win32Window {
   flutter::DartProject project_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> window_channel_;
 
+  std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> files_channel_;
   std::unique_ptr<DesktopInput> desktop_input_;
 
   // The Flutter instance hosted by this window.

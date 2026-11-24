@@ -1,5 +1,6 @@
 #include "flutter_window.h"
 #include "window_sizing.h"
+#include "file_dialogs.h"
 
 #include <optional>
 
@@ -27,6 +28,7 @@ bool FlutterWindow::OnCreate() {
   }
   RegisterPlugins(flutter_controller_->engine());
   desktop_input_ = std::make_unique<DesktopInput>(flutter_controller_->engine()->messenger());
+  files_channel_ = RegisterFileDialogs(flutter_controller_->engine()->messenger(), GetHandle());
   window_channel_ = RegisterWindowSizing(flutter_controller_->engine()->messenger(), GetHandle());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
@@ -44,6 +46,7 @@ bool FlutterWindow::OnCreate() {
 
 void FlutterWindow::OnDestroy() {
   desktop_input_.reset();
+  files_channel_.reset();
   window_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;

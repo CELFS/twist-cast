@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.18 - Unreleased
+
+- Send files up to 32 MiB in either direction between a phone and computer over a paired LAN connection, independently of screen sharing.
+- Preview the filename and size, accept or decline each file, and choose a destination after the transfer is verified.
+
 ## 0.1.17 - Unreleased
 
 - Reconnect to a recently paired phone or computer by name, check which devices are ready to receive, or wait for a specific sender.

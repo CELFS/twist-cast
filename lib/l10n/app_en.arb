@@ -48,7 +48,7 @@
   "sessionEnded": "Session ended. Your screen is no longer shared.",
   "notificationTitle": "TwistCast screen sharing",
   "notificationBody": "Your screen is being shared. Tap to return and stop.",
-  "versionLabel": "TwistCast 0.1.17",
+  "versionLabel": "TwistCast 0.1.18",
   "updateCheck": "Check for updates",
   "updateInstalled": "Installed",
   "updateLatest": "Latest",
@@ -63,7 +63,7 @@
   "updateDownloadFailed": "Download failed. Try again.",
   "updateInstallFailed": "Install failed. Check permissions.",
   "updateStopSession": "Stop sharing to update.",
-  "footerLabel": "© · 2026 · CELFS · v0.1.17",
+  "footerLabel": "© · 2026 · CELFS · v0.1.18",
   "resizeWindowFailed": "Could not resize the window automatically.",
   "showHeader": "Show title and language",
   "hideHeader": "Hide title and language",
@@ -129,5 +129,25 @@
         "type": "String"
       }
     }
-  }
+  },
+  "fileEnded": "File transfer session ended.",
+  "fileTransfer": "File transfer",
+  "sendFile": "Send a file",
+  "receiveFile": "Receive files",
+  "fileReceiverHint": "On the other device, select Send a file and choose this receiver.",
+  "fileSearch": "Looking for file receivers. Select Receive files on the other device.",
+  "filePairHint": "Compare the pairing code on both devices before transferring files.",
+  "fileLimit": "Choose one file up to 32 MiB.",
+  "fileWait": "Waiting for the sender to choose a file…",
+  "fileWaitAccept": "Waiting for the receiver to accept…",
+  "fileIncoming": "Accept this file?",
+  "fileWaitSave": "Delivered. Waiting for the receiver to save the file.",
+  "fileReadySave": "File received. Choose where to save it.",
+  "fileSaved": "File saved on the receiving device.",
+  "fileDeclined": "The receiver declined the file.",
+  "fileChoose": "Choose file to send",
+  "fileAccept": "Accept file",
+  "fileDecline": "Decline",
+  "fileSave": "Save file",
+  "fileDialogError": "Could not open or save the file. Please try again."
 }

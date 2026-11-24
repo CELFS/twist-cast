@@ -16,10 +16,14 @@ class MainActivity : FlutterActivity() {
     private var audioPermission: MethodChannel.Result? = null
     private var events: EventChannel.EventSink? = null
     private var updates: AppUpdates? = null
+    private var fileDialogs: FileDialogs? = null
     private var diagnosticExport: DiagnosticExport? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        fileDialogs = FileDialogs(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/files")
+            .setMethodCallHandler(fileDialogs)
         diagnosticExport = DiagnosticExport(this)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/diagnostics")
             .setMethodCallHandler(diagnosticExport)
@@ -103,6 +107,9 @@ class MainActivity : FlutterActivity() {
     override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/updates").setMethodCallHandler(null)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/diagnostics").setMethodCallHandler(null)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.twist.cast/files").setMethodCallHandler(null)
+        fileDialogs?.dispose()
+        fileDialogs = null
         diagnosticExport?.dispose()
         diagnosticExport = null
         updates?.dispose()
@@ -112,6 +119,7 @@ class MainActivity : FlutterActivity() {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
+        fileDialogs?.onResult(requestCode, resultCode, data)
         diagnosticExport?.onResult(requestCode, resultCode, data)
     }
 

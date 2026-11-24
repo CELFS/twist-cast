@@ -5,6 +5,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../l10n/generated/app_localizations.dart';
 import '../cast/cast_controller.dart';
+import '../files/file_transfer_card.dart';
 import '../cast/diagnostics_card.dart';
 import '../cast/receiver_page.dart';
 import '../cast/receiver_navigation.dart';
@@ -105,7 +106,7 @@ class _HomePageState extends State<HomePage> {
             : const EdgeInsets.all(24),
           child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 960),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(text.shareScreenTitle,
+              Text(_cast.filesOnly ? text.fileTransfer : text.shareScreenTitle,
                 style: Platform.isMacOS
                   ? theme.textTheme.headlineSmall?.copyWith(fontSize: 22)
                   : theme.textTheme.headlineMedium),
@@ -119,7 +120,7 @@ class _HomePageState extends State<HomePage> {
               ],
               if (!active) ...[
                 if (_cast.phase == CastPhase.failed) _Notice(text: text.sessionError, icon: Icons.error_outline),
-                if (_cast.phase == CastPhase.ended) _Notice(text: text.sessionEnded, icon: Icons.check_circle_outline),
+                if (_cast.phase == CastPhase.ended) _Notice(text: _cast.endedFileSession ? text.fileEnded : text.sessionEnded, icon: Icons.check_circle_outline),
                 Card(child: Padding(padding: const EdgeInsets.all(24), child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                     Icon(_cast.isMobile ? Icons.screen_share_outlined : Icons.desktop_windows_outlined, size: 56),
@@ -139,7 +140,16 @@ class _HomePageState extends State<HomePage> {
                       label: Text(_cast.isMobile ? text.receiveDesktop : text.shareDesktop)),
                   ],
                 ))),
+                const SizedBox(height: 12),
+                Wrap(alignment: WrapAlignment.center, spacing: 12, children: [
+                  OutlinedButton.icon(onPressed: _installingUpdate ? null : () => _cast.search(files: true),
+                    icon: const Icon(Icons.upload_file), label: Text(text.sendFile)),
+                  OutlinedButton.icon(onPressed: _installingUpdate ? null : () => _cast.receive(files: true),
+                    icon: const Icon(Icons.file_download_outlined), label: Text(text.receiveFile)),
+                ]),
               ],
+              if (_cast.phase == CastPhase.files && _cast.transfer != null)
+                FileTransferCard(key: ObjectKey(_cast.transfer), transfer: _cast.transfer!),
               if (_cast.busy) ...[
                 const LinearProgressIndicator(),
                 const SizedBox(height: 16),
@@ -147,30 +157,32 @@ class _HomePageState extends State<HomePage> {
               ],
               if (_cast.phase == CastPhase.receiving) Card(child: Padding(
                 padding: const EdgeInsets.all(24), child: Column(children: [
-                  Text(_cast.receivingFrom != null
+                  if (_cast.filesOnly && _cast.receiverName != null)
+                    Text(_cast.receiverName!, style: theme.textTheme.titleMedium),
+                  Text(_cast.filesOnly ? text.fileReceiverHint : _cast.receivingFrom != null
                       ? text.recentReceiveName(_cast.receivingFrom!.name)
                       : _cast.isMobile ? text.phoneReceiveHint : text.scanHint),
                   const SizedBox(height: 16),
-                  if (!_cast.isMobile && _cast.qr != null) ConstrainedBox(constraints: const BoxConstraints(maxWidth: 284),
+                  if (!_cast.filesOnly && !_cast.isMobile && _cast.qr != null) ConstrainedBox(constraints: const BoxConstraints(maxWidth: 284),
                     child: Container(color: Colors.white, padding: const EdgeInsets.all(12),
                       child: QrImageView(data: _cast.qr!, backgroundColor: Colors.white))),
                   const SizedBox(height: 12),
                   Text(text.invitationExpires),
-                  if (!_cast.isMobile && _cast.addresses.length > 1) DropdownButton<String>(
+                  if (!_cast.filesOnly && !_cast.isMobile && _cast.addresses.length > 1) DropdownButton<String>(
                     value: _cast.selectedAddress,
                     items: _cast.addresses.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
                     onChanged: (value) { if (value != null) _cast.selectAddress(value); },
                   ),
                   const SizedBox(height: 16),
-                  Text(text.discoveryNotice, textAlign: TextAlign.center),
+                  Text(_cast.filesOnly ? text.filePairHint : text.discoveryNotice, textAlign: TextAlign.center),
                 ]),
               )),
               if (_cast.phase == CastPhase.searching) ...[
                 const LinearProgressIndicator(),
                 const SizedBox(height: 16),
-                Text(_cast.isMobile ? text.searchHint : text.desktopSearchHint),
+                Text(_cast.filesOnly ? text.fileSearch : _cast.isMobile ? text.searchHint : text.desktopSearchHint),
                 for (final device in _cast.devices.values) Card(child: ListTile(
-                  leading: Icon(_cast.isMobile ? Icons.computer : Icons.smartphone), title: Text(device.name),
+                  leading: Icon(_cast.isMobile ? Icons.computer : Icons.smartphone), title: Text((_cast.filesOnly ? _cast.knownReceiver(device)?.name : null) ?? device.name),
                   trailing: const Icon(Icons.chevron_right), onTap: () => _cast.connectDevice(device),
                 )),
               ],
@@ -192,7 +204,7 @@ class _HomePageState extends State<HomePage> {
                     }
                   }),
               ],
-              if (_cast.isMobile && (!active || _cast.sending)) ...[
+              if (!_cast.filesOnly && _cast.isMobile && (!active || _cast.sending)) ...[
                 const SizedBox(height: 16),
                 SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(text.internalAudio),
                   subtitle: Text(text.audioHint), value: _cast.audio,

@@ -21,6 +21,7 @@ import 'package:twist_cast/app.dart';
 import 'package:twist_cast/core/device_identity.dart';
 import 'package:twist_cast/core/pairing_invitation.dart';
 import 'package:twist_cast/core/secure_session.dart';
+import 'package:twist_cast/features/files/file_transfer.dart';
 import 'package:twist_cast/core/recent_device.dart';
 
 void main() {
@@ -77,7 +78,7 @@ void main() {
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.text('Share computer screen'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.17'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.18'), findsOneWidget);
     if (Platform.isMacOS) {
       expect(tester.getSize(find.byType(AppFooter)).height, 20);
     } else {
@@ -444,4 +445,54 @@ void main() {
     await targeted.connect(host, await other.listen());
     await mismatchClosed.future.timeout(const Duration(seconds: 10));
   }, timeout: const Timeout(Duration(seconds: 90)));
+  test('file sessions pair over TLS, transfer chunks and exclude casting messages', () async {
+    FlutterSecureStorage.setMockInitialValues({});
+    final dest = await DeviceIdentity.load();
+    FlutterSecureStorage.setMockInitialValues({});
+    final source = await DeviceIdentity.load();
+    final interfaces = await NetworkInterface.list(type: InternetAddressType.IPv4);
+    final host = interfaces.expand((i) => i.addresses).map((a) => a.address).firstWhere(PairingInvitation.isLanAddress);
+    final receiverCode = Completer<String>(), senderCode = Completer<String>();
+    final receiverReady = Completer<void>(), senderReady = Completer<void>();
+    final offered = Completer<void>(), delivered = Completer<void>(), saved = Completer<void>();
+    final closed = Completer<void>();
+    late FileTransfer upload, download;
+    final server = SecureSession(identity: dest, filesOnly: true,
+      onPairing: (v, _) => receiverCode.complete(v), onAuthorized: () async => receiverReady.complete(),
+      onMessage: (m) async {
+        download.handle(m);
+        if (download.phase == FilePhase.offered) offered.complete();
+        if (download.received != null) delivered.complete();
+      }, onClosed: closed.complete);
+    final client = SecureSession(identity: source, filesOnly: true,
+      onPairing: (v, _) => senderCode.complete(v), onAuthorized: () async => senderReady.complete(),
+      onMessage: (m) async {
+        upload.handle(m);
+        if (upload.phase == FilePhase.saved) saved.complete();
+      }, onClosed: () {});
+    upload = FileTransfer(sender: true, send: client.send);
+    download = FileTransfer(sender: false, send: server.send);
+    addTearDown(upload.dispose);
+    addTearDown(download.dispose);
+    addTearDown(server.close);
+    addTearDown(client.close);
+    await client.connect(host, await server.listen());
+    expect(await senderCode.future, await receiverCode.future);
+    await client.approve();
+    expect(() => client.send({'type': 'file-offer'}), throwsStateError);
+    await server.approve();
+    await Future.wait([senderReady.future, receiverReady.future]);
+    final bytes = Uint8List.fromList(List.generate(FileTransfer.chunkSize + 3, (i) => i % 197));
+    upload.offer(TransferFile('payload.bin', bytes));
+    await offered.future;
+    expect(download.received, isNull);
+    download.accept();
+    await delivered.future;
+    expect(download.received, orderedEquals(bytes));
+    download.saved();
+    await saved.future;
+    client.send({'type': 'offer', 'sdp': 'unexpected in a file session'});
+    await closed.future.timeout(const Duration(seconds: 10));
+  }, timeout: const Timeout(Duration(seconds: 90)));
+
 }

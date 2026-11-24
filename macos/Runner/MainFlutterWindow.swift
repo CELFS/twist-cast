@@ -76,6 +76,30 @@ class MainFlutterWindow: NSWindow {
     let desktopInput = DesktopInput()
     FlutterMethodChannel(name: "app.twist.cast/desktop-input", binaryMessenger: flutterViewController.engine.binaryMessenger)
       .setMethodCallHandler { call, result in desktopInput.handle(call, result: result) }
+    FlutterMethodChannel(name: "app.twist.cast/files", binaryMessenger: flutterViewController.engine.binaryMessenger)
+      .setMethodCallHandler { call, result in
+        if call.method == "pick" {
+          let panel = NSOpenPanel()
+          panel.canChooseDirectories = false
+          panel.allowsMultipleSelection = false
+          panel.begin { response in result(response == .OK ? panel.url?.path : nil) }
+        } else if call.method == "save", let args = call.arguments as? [String: Any],
+                  let name = args["name"] as? String, let bytes = args["bytes"] as? FlutterStandardTypedData {
+          let panel = NSSavePanel()
+          panel.nameFieldStringValue = name
+          panel.begin { response in
+            guard response == .OK, let url = panel.url else { result(false); return }
+            DispatchQueue.global(qos: .userInitiated).async {
+              do {
+                try bytes.data.write(to: url, options: .atomic)
+                DispatchQueue.main.async { result(true) }
+              } catch {
+                DispatchQueue.main.async { result(FlutterError(code: "save", message: nil, details: nil)) }
+              }
+            }
+          }
+        } else { result(FlutterMethodNotImplemented) }
+      }
     let diagnostics = DiagnosticExport()
     FlutterMethodChannel(name: "app.twist.cast/diagnostics", binaryMessenger: flutterViewController.engine.binaryMessenger)
       .setMethodCallHandler { call, result in diagnostics.handle(call, result: result) }
