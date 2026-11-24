@@ -13,13 +13,14 @@ import 'receiver_pointer.dart';
 
 class ReceiverView extends StatefulWidget {
   const ReceiverView({required this.renderer, required this.onStop,
-    required this.headerVisible, required this.onToggleHeader, this.showControls = true, this.onPointer, this.onDesktopKey, this.extraControl, this.navigation, super.key});
+    required this.headerVisible, required this.onToggleHeader, this.showControls = true, this.onPointer, this.onDesktopKey, this.onPaste, this.extraControl, this.navigation, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool headerVisible;
   final bool showControls;
   final RemotePointer? onPointer;
   final DesktopKey? onDesktopKey;
+  final VoidCallback? onPaste;
   final Widget? extraControl;
   final Widget? navigation;
   final VoidCallback onToggleHeader;
@@ -129,6 +130,14 @@ class _ReceiverViewState extends State<ReceiverView> {
                   ),
                 ))
               : ColoredBox(color: Platform.isMacOS ? Colors.transparent : Colors.black, child: video));
+          final paste = widget.onPaste;
+          if (paste != null) {
+            return CallbackShortcuts(bindings: {
+              SingleActivator(LogicalKeyboardKey.keyV, meta: Platform.isMacOS,
+                control: !Platform.isMacOS, includeRepeats: false): paste,
+            }, child: Focus(autofocus: true, child: Builder(builder: (focusContext) =>
+              Listener(onPointerDown: (_) => Focus.of(focusContext).requestFocus(), child: surface))));
+          }
           if (!_mobile) return surface;
           final inspect = !desktopControl || _inspect;
           return InteractiveViewer(panEnabled: inspect, scaleEnabled: inspect, maxScale: 5, child: surface);

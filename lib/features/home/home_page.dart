@@ -78,6 +78,7 @@ class _HomePageState extends State<HomePage> {
       if (viewing) {
         final media = _cast.media!;
         return ReceiverPage(renderer: media.renderer,
+          onPaste: media.canPaste ? media.pasteFromClipboard : null,
           onDesktopKey: media.canUseDesktopInput ? media.sendDesktopKey : null,
           onPointer: media.canSendPointer ? media.sendPointer : null,
           navigation: media.canSendNavigation ? ReceiverNavigation(onNavigate: media.sendNavigation) : null,

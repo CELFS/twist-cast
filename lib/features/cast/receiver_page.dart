@@ -11,10 +11,11 @@ import 'receiver_pointer.dart';
 import 'receiver_view.dart';
 import 'display_power.dart';
 import 'desktop_keyboard.dart';
+import 'cast_media.dart';
 
 class ReceiverPage extends StatefulWidget {
   const ReceiverPage({required this.renderer, required this.onStop,
-    required this.header, this.diagnostics, this.onPointer, this.onDesktopKey, this.navigation, this.canSetDisplayPower = false, super.key});
+    required this.header, this.diagnostics, this.onPointer, this.onDesktopKey, this.onPaste, this.navigation, this.canSetDisplayPower = false, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool canSetDisplayPower;
@@ -23,6 +24,7 @@ class ReceiverPage extends StatefulWidget {
   final Widget? navigation;
   final RemotePointer? onPointer;
   final DesktopKey? onDesktopKey;
+  final Future<PhonePasteResult> Function()? onPaste;
 
   @override
   State<ReceiverPage> createState() => _ReceiverPageState();
@@ -31,6 +33,7 @@ class ReceiverPage extends StatefulWidget {
 class _ReceiverPageState extends State<ReceiverPage> {
   static const _window = MethodChannel('app.twist.cast/window');
   final _displayPower = DisplayPower();
+  bool _pasting = false;
   bool _showHeader = false;
   bool _nativeControls = false;
   String? _controlsLabel;
@@ -55,6 +58,37 @@ class _ReceiverPageState extends State<ReceiverPage> {
       _controlsLabel = label;
       _configureTitlebar(label);
     }
+  }
+
+  Future<void> _paste() async {
+    final paste = widget.onPaste;
+    if (paste == null || _pasting) return;
+    _pasting = true;
+    try {
+      final result = await paste();
+      if (!mounted || result == PhonePasteResult.pasted) return;
+      final text = AppLocalizations.of(context);
+      final message = switch (result) {
+        PhonePasteResult.empty => text.pasteEmpty,
+        PhonePasteResult.tooLong => text.pasteTooLong,
+        PhonePasteResult.noField => text.pasteNoField,
+        PhonePasteResult.copied => text.pasteCopied,
+        PhonePasteResult.unconfirmed => text.pasteUnconfirmed,
+        _ => text.pasteUnavailable,
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      _pasting = false;
+    }
+  }
+
+  Widget? get _navigation {
+    if (widget.onPaste == null) return widget.navigation;
+    return Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+      if (widget.navigation != null) Expanded(child: widget.navigation!),
+      IconButton(onPressed: _paste, tooltip: AppLocalizations.of(context).pasteToPhone,
+        icon: const Icon(Icons.content_paste)),
+    ]);
   }
 
   Future<void> _configureTitlebar(String label) async {
@@ -89,9 +123,10 @@ class _ReceiverPageState extends State<ReceiverPage> {
       child: Stack(children: [
       Positioned.fill(child: ReceiverView(renderer: widget.renderer,
         onDesktopKey: widget.onDesktopKey,
+        onPaste: widget.onPaste != null ? _paste : null,
         onPointer: Platform.isMacOS && _showHeader ? null : widget.onPointer,
         onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
-        navigation: widget.navigation,
+        navigation: _navigation,
         extraControl: widget.canSetDisplayPower ? DisplayPowerButton(power: _displayPower) : null,
         onToggleHeader: () => setState(() => _showHeader = !_showHeader))),
       if (Platform.isMacOS && _showHeader) ...[
@@ -109,7 +144,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
                 ReceiverToolbar(onStop: widget.onStop, headerVisible: true,
                   extraControl: widget.canSetDisplayPower ? DisplayPowerButton(power: _displayPower) : null,
                   onToggleHeader: () => setState(() => _showHeader = false)),
-                ?widget.navigation,
+                ?_navigation,
                 if (widget.diagnostics != null) widget.diagnostics!,
               ],
             )))),

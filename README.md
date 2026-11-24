@@ -6,13 +6,13 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.15 is a native Flutter client for one-to-one screen sharing between a phone and a computer over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
+TwistCast 0.1.16 is a native Flutter client for one-to-one screen sharing between a phone and a computer over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
 
 During a session, the receiver places its controls above the shared screen and hides setup guidance. Desktop windows fit the incoming screen aspect ratio, including orientation changes, while the picture remains fully visible. The application header includes the TwistCast icon, and the copyright and version stay at the bottom of the window.
 
 ## Platform status
 
-| Platform | Role in 0.1.15 | Implementation |
+| Platform | Role in 0.1.16 | Implementation |
 | --- | --- | --- |
 | Android | Share the phone screen and internal audio, or view and control a desktop | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the phone screen and internal audio, or view and control a desktop | ReplayKit broadcast extension and App Group socket |
@@ -59,6 +59,8 @@ macOS shares the main display. Windows and Linux share the first screen reported
 ### Mouse control of an Android phone
 
 On Android 8.0 or later, enable **Allow mouse control** on the phone once sharing starts. Enable TwistCast in Android accessibility settings when prompted, then return to TwistCast and enable the switch for this session. Use the desktop mouse to tap, press and hold, drag, or scroll within the shared screen. Two-finger trackpad pans over the shared screen act as single-finger swipes on Android. Use the receiver controls for Back, Home, and Recent apps. Mouse control turns off when the session ends.
+
+With version 0.1.16 or later on both devices, copy plain text on the computer, click the Android input field in the shared picture, then press **Command-V** on macOS or **Ctrl-V** on Windows and Linux. The receiver controls also include **Paste text on phone**. Each paste replaces the Android clipboard and asks the focused app to paste at its cursor or selection. If the app declines, use its own Paste command. Sending the message remains a separate action.
 
 ### Turn off the phone display
 
@@ -148,7 +150,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.15`; the local development build number is `16`. CI assigns increasing build numbers independently for published updates.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.16`; the local development build number is `17`. CI assigns increasing build numbers independently for published updates.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -156,7 +158,7 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.15 shares one screen in either direction between a phone and a computer on the same local network.
+0.1.16 shares one screen in either direction between a phone and a computer on the same local network.
 
 ## License
 

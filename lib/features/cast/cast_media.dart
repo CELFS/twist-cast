@@ -7,6 +7,8 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'cast_diagnostics.dart';
 import 'diagnostic_log.dart';
 
+enum PhonePasteResult { pasted, copied, noField, empty, tooLong, unavailable, unconfirmed }
+
 enum RemoteNavigation { back, home, recents }
 
 class CastMedia {
@@ -37,6 +39,12 @@ class CastMedia {
   bool _reportedPlaying = false;
   bool _peerSupportsTouch = false;
   bool _peerSupportsNavigation = false;
+  bool _peerSupportsPaste = false;
+  int _pasteId = 0;
+  Completer<PhonePasteResult>? _pendingPaste;
+  // Even after JSON escaping, this fits the secure session's frame limit.
+  static const _maxPasteLength = 16384;
+  bool get canPaste => _desktop && canSendPointer && _peerSupportsPaste;
   bool remoteTouchEnabled = false;
   bool get canSendPointer => !_closed && !_sending && _reportedPlaying && remoteTouchEnabled;
   bool get canEnableRemoteTouch => _sending && ((Platform.isAndroid && _peerSupportsTouch) || (_desktop && _peerDesktopInput)) && _reportedPlaying && !_closed;
@@ -67,6 +75,45 @@ class CastMedia {
     send({'type': 'pointer', 'action': action, 'x': point.dx, 'y': point.dy,
       'dx': scroll.dx.clamp(-0.35, 0.35), 'dy': scroll.dy.clamp(-0.35, 0.35),
       'landscape': landscape});
+  }
+
+  Future<PhonePasteResult> pasteFromClipboard() async {
+    if (!canPaste) return PhonePasteResult.unavailable;
+    if (_pendingPaste != null) return PhonePasteResult.unavailable;
+    final reply = Completer<PhonePasteResult>();
+    _pendingPaste = reply;
+    final id = ++_pasteId;
+    try {
+      final data = await Clipboard.getData(Clipboard.kTextPlain);
+      if (!canPaste || reply.isCompleted) return PhonePasteResult.unavailable;
+      final text = data?.text;
+      if (text == null || text.isEmpty) return PhonePasteResult.empty;
+      if (text.length > _maxPasteLength) return PhonePasteResult.tooLong;
+      send({'type': 'paste', 'id': id, 'text': text});
+      return await reply.future.timeout(const Duration(seconds: 5),
+        onTimeout: () => PhonePasteResult.unconfirmed);
+    } on PlatformException {
+      return PhonePasteResult.unavailable;
+    } on StateError {
+      return PhonePasteResult.unavailable;
+    } finally {
+      _pendingPaste = null;
+    }
+  }
+
+  Future<void> _receivePaste(Map<String, dynamic> message) async {
+    if (!Platform.isAndroid || !_sending || !_peerSupportsPaste || message['id'] is! int) return;
+    final text = message['text'];
+    var status = 'unavailable';
+    if (canEnableRemoteTouch && remoteTouchEnabled && text is String &&
+        text.isNotEmpty && text.length <= _maxPasteLength) {
+      try {
+        status = await _native.invokeMethod<String>('pasteText', {'text': text}) ?? status;
+      } on PlatformException {
+        // An unavailable accessibility service should not interrupt the video.
+      }
+    }
+    if (!_closed) send({'type': 'paste-result', 'id': message['id'], 'status': status});
   }
 
   void sendDesktopKey(String key, [String? text]) {
@@ -235,7 +282,7 @@ class CastMedia {
     if (!_closed) {
       send({'type': 'offer', 'sdp': offer.sdp,
         if (_desktopControlOffered) 'desktopInput': true,
-        if (Platform.isAndroid) ...{'touch': true, 'navigation': true}});
+        if (Platform.isAndroid) ...{'touch': true, 'navigation': true, 'paste': true}});
     }
   }
 
@@ -281,9 +328,21 @@ class CastMedia {
   Future<void> handle(Map<String, dynamic> message) async {
     if (_closed || _peer == null) return;
     switch (message['type']) {
+      case 'paste':
+        await _receivePaste(message);
+      case 'paste-result':
+        final pending = _pendingPaste;
+        if (!canPaste || pending == null || pending.isCompleted || message['id'] != _pasteId) return;
+        pending.complete(switch (message['status']) {
+          'pasted' => PhonePasteResult.pasted,
+          'copied' => PhonePasteResult.copied,
+          'noField' => PhonePasteResult.noField,
+          _ => PhonePasteResult.unavailable,
+        });
       case 'touch-state':
         if (_sending || !_supportsInput || !_reportedPlaying) return;
         remoteTouchEnabled = message['enabled'] == true;
+        if (!remoteTouchEnabled) _cancelPaste();
         onConnected();
       case 'pointer':
         try {
@@ -315,13 +374,16 @@ class CastMedia {
         _peerSupportsTouch = message['touch'] == true && (!_sending || Platform.isAndroid);
         _peerDesktopInput = message['desktopInput'] == true &&
             (_sending ? _desktopControlOffered : Platform.isAndroid || Platform.isIOS);
+        _peerSupportsPaste = _peerSupportsTouch && message['paste'] == true &&
+            (_sending ? Platform.isAndroid : _desktop);
         _peerSupportsNavigation = !_sending && message['navigation'] == true;
         for (final candidate in _pendingIce) { await _peer!.addCandidate(candidate); }
         _pendingIce.clear();
         if (!_sending) {
           final answer = await _peer!.createAnswer();
           await _peer!.setLocalDescription(answer);
-          send({'type': 'answer', 'sdp': answer.sdp, if (_peerDesktopInput) 'desktopInput': true, if (_peerSupportsTouch) 'touch': true});
+          send({'type': 'answer', 'sdp': answer.sdp, if (_peerDesktopInput) 'desktopInput': true, if (_peerSupportsTouch) 'touch': true,
+            if (_peerSupportsPaste) 'paste': true});
         }
       case 'ice':
         final candidate = message['candidate'];
@@ -333,9 +395,15 @@ class CastMedia {
     }
   }
 
+  void _cancelPaste() {
+    final pending = _pendingPaste;
+    if (pending != null && !pending.isCompleted) pending.complete(PhonePasteResult.unavailable);
+  }
+
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
+    _cancelPaste();
     _diagnostics?.dispose();
     Object? failure;
     Future<void> release(Future<void> Function() action) async {

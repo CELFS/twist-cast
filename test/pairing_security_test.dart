@@ -76,7 +76,7 @@ void main() {
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.text('Share computer screen'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.15'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.16'), findsOneWidget);
     if (Platform.isMacOS) {
       expect(tester.getSize(find.byType(AppFooter)).height, 20);
     } else {

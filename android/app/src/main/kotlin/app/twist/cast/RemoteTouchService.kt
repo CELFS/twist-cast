@@ -3,6 +3,9 @@ package app.twist.cast
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.GestureDescription
 import android.app.KeyguardManager
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.view.accessibility.AccessibilityNodeInfo
 import android.graphics.Path
 import android.graphics.PointF
 import android.os.Build
@@ -32,6 +35,27 @@ class RemoteTouchService : AccessibilityService() {
         if (active === this) active = null
         cancelTouch()
         super.onDestroy()
+    }
+
+    @Suppress("DEPRECATION")
+    fun pasteText(text: String): String {
+        if (!CaptureService.running || text.isEmpty() || text.length > 16384 ||
+            getSystemService(KeyguardManager::class.java).isKeyguardLocked) return "unavailable"
+        val root = rootInActiveWindow ?: return "noField"
+        try {
+            val field = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return "noField"
+            try {
+                if (!field.isFocused || !field.isEditable || !field.isEnabled) return "noField"
+                val clipboard = getSystemService(ClipboardManager::class.java)
+                clipboard.setPrimaryClip(ClipData.newPlainText("TwistCast", text))
+                // Let the target editor apply its own selection, formatting and input rules.
+                return if (field.performAction(AccessibilityNodeInfo.ACTION_PASTE)) "pasted" else "copied"
+            } finally {
+                field.recycle()
+            }
+        } finally {
+            root.recycle()
+        }
     }
 
     fun cancelTouch() {

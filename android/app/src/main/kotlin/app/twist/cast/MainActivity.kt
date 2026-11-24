@@ -74,6 +74,13 @@ class MainActivity : FlutterActivity() {
                         RemoteTouchService.active?.cancelTouch()
                         result.success(null)
                     }
+                    "pasteText" -> {
+                        val text = call.argument<String>("text")
+                        val status = if (text == null) null else try {
+                            RemoteTouchService.active?.pasteText(text)
+                        } catch (_: SecurityException) { null }
+                        result.success(status ?: "unavailable")
+                    }
                     "remotePointer" -> {
                         if (CaptureService.running) RemoteTouchService.active?.pointer(
                             call.argument<String>("action") ?: "",

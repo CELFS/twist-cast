@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.16 - Unreleased
+
+- Paste computer clipboard text into the focused Android field during an authorized control session using Command-V or Ctrl-V.
+
 ## 0.1.15 - Unreleased
 
 - Share a desktop screen with an Android phone or iPhone over a paired LAN connection.
