@@ -10,7 +10,7 @@ on:
         description: Build all packages and publish new builds, or rebuild selected packages as workflow artifacts
         type: choice
         default: all
-        options: [all, android, macos, android-arm64-v8a, android-armeabi-v7a, android-x86_64]
+        options: [all, android, macos, windows, android-arm64-v8a, android-armeabi-v7a, android-x86_64]
 
 permissions:
   contents: read
@@ -33,6 +33,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       android: ${{ steps.version.outputs.android }}
       macos: ${{ steps.version.outputs.macos }}
+      windows: ${{ steps.version.outputs.windows }}
       publish: ${{ steps.release-policy.outputs.publish }}
       android_matrix: ${{ steps.version.outputs.android_matrix }}
       notices_abi: ${{ steps.version.outputs.notices_abi }}
@@ -331,8 +332,56 @@ jobs:
           compression-level: 0
           retention-days: 14
 
+  windows:
+    needs: metadata
+    if: needs.metadata.outputs.windows == 'true'
+    runs-on: windows-2022
+    timeout-minutes: 40
+    env:
+      VERSION: ${{ needs.metadata.outputs.version }}
+      BUILD_NUMBER: ${{ needs.metadata.outputs.build_number }}
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/flutter
+        with:
+          version: ${{ env.FLUTTER_VERSION }}
+          platform: windows
+          write-cache: 'true'
+      - name: Compile Windows x64 receiver
+        run: flutter build windows --release --no-pub --build-number "$env:BUILD_NUMBER" --dart-define="TWISTCAST_COMMIT=$env:GITHUB_SHA"
+      - name: Build Windows installer
+        run: |
+          if (!(Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup --version=6.4.3 -y --no-progress
+            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          }
+          python tool/release.py windows-installer
+      - name: Verify the installed receiver
+        run: |
+          $installer = "build/release/twist-cast-$env:VERSION-windows-x64-setup.exe"
+          $dest = Join-Path $env:RUNNER_TEMP 'TwistCast install test'
+          $install = Start-Process $installer -ArgumentList "/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /DIR=`"$dest`"" -PassThru -Wait
+          if ($install.ExitCode -ne 0) { throw "Setup exited with $($install.ExitCode)" }
+          $bundle = (Resolve-Path 'build/windows/x64/runner/Release').Path
+          Get-ChildItem $bundle -Recurse -File -Exclude *.pdb,*.lib,*.exp | ForEach-Object {
+            $installed = Join-Path $dest ([IO.Path]::GetRelativePath($bundle, $_.FullName))
+            if ((Get-FileHash $_.FullName).Hash -ne (Get-FileHash $installed).Hash) {
+              throw "Installed file differs from the build: $installed"
+            }
+          }
+          if (!(Test-Path "$dest/Licenses/THIRD_PARTY_NOTICES.md")) { throw 'Missing notices' }
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-release
+          path: build/release/twist-cast-${{ env.VERSION }}-windows-x64-setup.exe
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
   publish:
-    needs: [metadata, checks, android, macos]
+    needs: [metadata, checks, android, macos, windows]
     if: needs.metadata.outputs.publish == 'true'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
@@ -364,6 +413,7 @@ jobs:
           test -f "build/release/twist-cast-$VERSION-macos-universal.dmg"
           test -f "build/release/twist-cast-$VERSION-macos-universal.pkg"
           test -f build/release/appcast.xml
+          test -s "build/release/twist-cast-$VERSION-windows-x64-setup.exe"
           for abi in arm64-v8a armeabi-v7a x86_64; do
             test -f "build/release/twist-cast-$VERSION-android-$abi.apk"
           done
@@ -378,9 +428,10 @@ jobs:
 
           - Android phones: download `android-arm64-v8a.apk` for most current phones. ARMv7 and x86_64 packages are also provided.
           - macOS: download `macos-universal.pkg` and follow the installer to install or replace TwistCast in Applications. Quit TwistCast when prompted. Supports Apple Silicon and Intel Macs. The installer is unsigned and the application is ad-hoc signed, without notarization; macOS may require approval in System Settings > Privacy & Security. The DMG is retained for in-app Sparkle updates.
+          - Windows x64: run the `windows-x64-setup.exe` installer, then open TwistCast from Start. The installer is unsigned.
           - Android release packages use a dedicated signing key. An existing debug-signed installation must be uninstalled first; uninstalling removes its local pairing data. Later releases retain the same release key for in-place updates.
           - These are early testing builds. Real-device capture, internal audio, and cross-device operation still need verification.
-          - Checksums and third-party notices are included. iOS, Windows, and Linux packages are not included in this release workflow.
+          - Checksums and third-party notices are included.
           NOTES
           if draft=$(gh release view "$TAG" --json isDraft --jq .isDraft 2>/dev/null); then
             test "$draft" = true || { echo 'This build is already published; keeping its existing assets.'; exit 0; }
@@ -391,7 +442,7 @@ jobs:
           gh release edit "$TAG" --draft=false --latest --notes-file build/release-notes.md
 
   timings:
-    needs: [metadata, checks, android-toolchain, android, macos, publish]
+    needs: [metadata, checks, android-toolchain, android, macos, windows, publish]
     if: always()
     runs-on: ubuntu-24.04
     timeout-minutes: 5

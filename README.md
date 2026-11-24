@@ -6,13 +6,13 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.13 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
+TwistCast 0.1.14 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
 
 During a session, the receiver places its controls above the shared screen and hides setup guidance. Desktop windows fit the incoming screen aspect ratio, including orientation changes, while the picture remains fully visible. The application header includes the TwistCast icon, and the copyright and version stay at the bottom of the window.
 
 ## Platform status
 
-| Platform | Role in 0.1.13 | Implementation |
+| Platform | Role in 0.1.14 | Implementation |
 | --- | --- | --- |
 | Android | Share the full phone screen and internal audio | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the full phone screen and internal audio | ReplayKit broadcast extension and App Group socket |
@@ -67,7 +67,7 @@ Android's sleep timeout still applies. Some devices may stop projection when the
 
 ## Downloads
 
-Download Android APKs and the macOS universal PKG installer from [GitHub Releases](https://github.com/CELFS/twist-cast/releases). New builds, including same-version updates, are published after the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) completes successfully. Each published build has its own tag and increasing build number; previous releases remain available. Focused builds are available in each run's Artifacts. See [Release builds](docs/releases.md) for signing setup, direct configuration links, and installation instructions. Update checks remain available during screen sharing; downloading or installing an update requires ending the session.
+Download Android APKs, the macOS universal PKG installer, and the Windows x64 setup executable from [GitHub Releases](https://github.com/CELFS/twist-cast/releases). New builds, including same-version updates, are published after the [Release workflow](https://github.com/CELFS/twist-cast/actions/workflows/release.yml) completes successfully. Each published build has its own tag and increasing build number; previous releases remain available. Focused builds are available in each run's Artifacts. See [Release builds](docs/releases.md) for signing setup, direct configuration links, and installation instructions. Update checks remain available during screen sharing; downloading or installing an update requires ending the session.
 
 ## Development
 
@@ -76,7 +76,7 @@ Requirements:
 - Flutter 3.50.0 stable and Dart 3.14.0.
 - Android: Java 17 and an Android SDK compatible with the Flutter project. The first build downloads the required Gradle, native SDK, and plugin artifacts.
 - macOS and iOS: full Xcode. Apple Command Line Tools alone cannot build these applications.
-- Windows: Visual Studio with Desktop development with C++.
+- Windows: Visual Studio with Desktop development with C++ and the x64 ATL component.
 - Linux: Flutter desktop prerequisites, GTK development files, `libsecret-1-dev`, and a running Secret Service and Avahi service.
 
 Use Cursor or another Dart-compatible editor. A phone is not required to develop or run the desktop receiver. It is required to validate phone capture and system permissions.
@@ -137,7 +137,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.13`; the local development build number is `14`. CI assigns increasing build numbers independently for published updates.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.14`; the local development build number is `15`. CI assigns increasing build numbers independently for published updates.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -145,7 +145,7 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.13 shares the entire phone screen with one desktop receiver. Clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
+0.1.14 shares the entire phone screen with one desktop receiver. Clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
 
 ## License
 

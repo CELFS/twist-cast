@@ -15,6 +15,7 @@
 #   python3 tool/release.py update-manifest
 #   python3 tool/release.py appcast
 #   python3 tool/release.py macos-pkg
+#   python tool/release.py windows-installer
 # Input timestamps are saved with macOS compilation outputs and restored only for identical files.
 # Outputs go to build/release; metadata also writes GitHub Actions job outputs.
 
@@ -30,6 +31,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 import zipfile
 from xml.etree import ElementTree
 
@@ -94,10 +96,10 @@ def metadata():
         raise SystemExit('Expected version: major.minor.patch+build in pubspec.yaml.')
     version, build_number = match.groups()
     for locale in ('en', 'zh'):
-        strings = json.loads((ROOT / f'lib/l10n/app_{locale}.arb').read_text())
+        strings = json.loads((ROOT / f'lib/l10n/app_{locale}.arb').read_text(encoding='utf-8'))
         if strings['versionLabel'] != f'TwistCast {version}':
             raise SystemExit(f'The {locale} interface version does not match pubspec.yaml.')
-    strings = json.loads((ROOT / 'lib/l10n/app_en.arb').read_text())
+    strings = json.loads((ROOT / 'lib/l10n/app_en.arb').read_text(encoding='utf-8'))
     if not strings['footerLabel'].endswith(f' · v{version}'):
         raise SystemExit('The interface footer version does not match pubspec.yaml.')
     with (ROOT / 'ios/BroadcastExtension/Info.plist').open('rb') as stream:
@@ -119,7 +121,7 @@ def metadata():
         {'abi': 'x86_64', 'target': 'android-x64'},
     ]
     selected = os.environ.get('RELEASE_TARGET', 'all')
-    choices = ['all', 'android', 'macos', *(f'android-{item["abi"]}' for item in targets)]
+    choices = ['all', 'android', 'macos', 'windows', *(f'android-{item["abi"]}' for item in targets)]
     if selected not in choices:
         raise SystemExit('Unknown release target: ' + selected)
     android = [item for item in targets if selected in ('all', 'android', f'android-{item["abi"]}')]
@@ -127,6 +129,7 @@ def metadata():
         'version': version, 'build_number': build_number, 'tag': tag,
         'android': str(bool(android)).lower(),
         'macos': str(selected in ('all', 'macos')).lower(),
+        'windows': str(selected in ('all', 'windows')).lower(),
         'publish': str(selected == 'all').lower(),
         'android_matrix': json.dumps({'include': android}, separators=(',', ':')),
         'notices_abi': android[0]['abi'] if android else '',
@@ -311,18 +314,44 @@ def update_manifest():
     }, indent=2) + '\n')
 
 
-def notices():
-    OUTPUT.mkdir(parents=True, exist_ok=True)
+def source_notice_files():
     paths = [ROOT / 'LICENSE', ROOT / 'THIRD_PARTY_NOTICES.md', ROOT / 'docs/licenses/Sparkle.txt',
              ROOT / 'packages/flutter_webrtc/LICENSE',
              ROOT / 'packages/flutter_webrtc/NOTICE',
              ROOT / 'packages/flutter_webrtc/TWISTCAST_PATCHES.md',
              ROOT / 'packages/flutter_webrtc/third_party/svpng/LICENSE']
     paths.extend(sorted((ROOT / 'packages/flutter_webrtc/third_party/licenses').rglob('*')))
+    return [path for path in paths if path.is_file()]
+
+
+def windows_installer():
+    values = metadata()
+    compiler = shutil.which('ISCC') or Path(os.environ.get('ProgramFiles(x86)', '')) / 'Inno Setup 6/ISCC.exe'
+    if not Path(compiler).is_file():
+        raise SystemExit('Install Inno Setup 6 or add ISCC.exe to PATH.')
+    bundle = ROOT / 'build/windows/x64/runner/Release'
+    for name in ('twist_cast.exe', 'flutter_windows.dll', 'flutter_webrtc_plugin.dll', 'libwebrtc.dll',
+                 'bonsoir_windows_plugin.dll', 'flutter_secure_storage_windows_plugin.dll',
+                 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll',
+                 'data/app.so', 'data/icudtl.dat', 'data/flutter_assets/NOTICES.Z'):
+        if not (bundle / name).is_file():
+            raise SystemExit(f'Missing Windows x64 release file: {name}')
+    OUTPUT.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory() as temp:
+        for path in source_notice_files():
+            dest = Path(temp) / path.relative_to(ROOT)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, dest)
+        subprocess.run([str(compiler), f'/DAppVersion={values["version"]}',
+                        f'/DBuildNumber={values["build_number"]}', f'/DNoticesDir={temp}',
+                        f'/O{OUTPUT}', str(ROOT / 'tool/windows-installer.iss')], check=True)
+
+
+def notices():
+    OUTPUT.mkdir(parents=True, exist_ok=True)
     with zipfile.ZipFile(OUTPUT / 'THIRD_PARTY_NOTICES.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
-        for path in paths:
-            if path.is_file():
-                archive.write(path, path.relative_to(ROOT))
+        for path in source_notice_files():
+            archive.write(path, path.relative_to(ROOT))
         # Preserve Flutter's generated package notices from the actual APK build.
         apk_dir = ROOT / 'build/app/outputs/flutter-apk'
         apks = sorted(apk_dir.glob('app-*-release.apk'))
@@ -378,7 +407,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('command', choices=['metadata', 'release-policy', 'notices', 'checksums', 'timings', 'appcast',
                                           'macos-input-key', 'save-input-times', 'restore-input-times',
-                                          'check-inputs', 'preflight', 'update-manifest', 'macos-pkg'])
+                                          'check-inputs', 'preflight', 'update-manifest', 'macos-pkg', 'windows-installer'])
     command = parser.parse_args().command
     if command in ('metadata', 'release-policy'):
         values = metadata() if command == 'metadata' else release_policy()
@@ -401,6 +430,8 @@ def main():
         appcast()
     elif command == 'macos-pkg':
         macos_pkg()
+    elif command == 'windows-installer':
+        windows_installer()
     elif command == 'macos-input-key':
         macos_input_key()
     elif command in ('save-input-times', 'restore-input-times'):
