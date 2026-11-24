@@ -116,8 +116,10 @@ class DesktopInput {
       for (int i = 0; i < count; ++i) add(units[i], KEYEVENTF_UNICODE);
     } else {
       static const std::map<std::string, WORD> keys = {
-          {"Enter", VK_RETURN}, {"Backspace", VK_BACK}, {"Tab", VK_TAB}, {"Escape", VK_ESCAPE},
-          {"Left", VK_LEFT}, {"Right", VK_RIGHT}, {"Up", VK_UP}, {"Down", VK_DOWN}};
+          {"Enter", WORD{VK_RETURN}}, {"Backspace", WORD{VK_BACK}},
+          {"Tab", WORD{VK_TAB}}, {"Escape", WORD{VK_ESCAPE}},
+          {"Left", WORD{VK_LEFT}}, {"Right", WORD{VK_RIGHT}},
+          {"Up", WORD{VK_UP}}, {"Down", WORD{VK_DOWN}}};
       const auto it = keys.find(*key);
       if (it == keys.end()) return false;
       add(it->second, it->second >= VK_LEFT && it->second <= VK_DOWN ? KEYEVENTF_EXTENDEDKEY : 0);
