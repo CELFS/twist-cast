@@ -74,8 +74,9 @@ void main() {
     addTearDown(tester.view.resetDevicePixelRatio);
     await tester.pumpWidget(const TwistCastApp());
     expect(find.text('Start receiving'), findsOneWidget);
+    expect(find.text('Share computer screen'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.14'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.15'), findsOneWidget);
     if (Platform.isMacOS) {
       expect(tester.getSize(find.byType(AppFooter)).height, 20);
     } else {
@@ -105,6 +106,33 @@ void main() {
       expect(tester.getBottomRight(footer).dy, 360);
     }
     expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('authorized phone touch maps only the displayed desktop and cancels a drag', (tester) async {
+    final events = <(String, Offset)>[];
+    Widget surface(bool allowTouch) => MaterialApp(home: Center(child: SizedBox(
+      width: 300, height: 200,
+      child: ReceiverPointer(videoSize: const Size(1, 1), allowTouch: allowTouch,
+        onPointer: (action, point, _, _) => events.add((action, point)),
+        child: const SizedBox.expand()),
+    )));
+    await tester.pumpWidget(surface(false));
+    final center = tester.getCenter(find.byType(ReceiverPointer));
+    await tester.tapAt(center);
+    expect(events, isEmpty);
+    await tester.pumpWidget(surface(true));
+    await tester.tapAt(center + const Offset(125, 0));
+    expect(events, isEmpty);
+    final finger = await tester.startGesture(center);
+    final second = await tester.startGesture(center, pointer: 8);
+    await second.up();
+    await finger.moveTo(center + const Offset(50, 0));
+    await finger.cancel();
+    expect(events, [('down', const Offset(.5, .5)), ('move', const Offset(.75, .5)),
+      ('cancel', Offset.zero)]);
+    events.clear();
+    await tester.longPressAt(center);
+    expect(events, [('secondary', const Offset(.5, .5))]);
   });
 
   testWidgets('trackpad pans send one continuous swipe from the shared image', (tester) async {

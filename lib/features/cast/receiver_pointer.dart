@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/widgets.dart';
 
@@ -6,11 +8,12 @@ typedef RemotePointer = void Function(String action, Offset point,
 
 class ReceiverPointer extends StatefulWidget {
   const ReceiverPointer({required this.videoSize, required this.onPointer,
-    required this.child, super.key});
+    required this.child, this.allowTouch = false, super.key});
 
   final Size videoSize;
   final RemotePointer? onPointer;
   final Widget child;
+  final bool allowTouch;
 
   @override
   State<ReceiverPointer> createState() => _ReceiverPointerState();
@@ -18,6 +21,9 @@ class ReceiverPointer extends StatefulWidget {
 
 class _ReceiverPointerState extends State<ReceiverPointer> with WidgetsBindingObserver {
   int? _pointer;
+  Offset? _pendingTap;
+  Timer? _longPress;
+  bool _contextClick = false;
   int? _trackpad;
   Offset? _trackpadOrigin;
   Offset? _trackpadPosition;
@@ -39,7 +45,10 @@ class _ReceiverPointerState extends State<ReceiverPointer> with WidgetsBindingOb
 
   void _cancel(RemotePointer? send) {
     if (!_hasGesture) return;
-    final touching = _pointer != null || _trackpadPosition != null;
+    final touching = (_pointer != null && _pendingTap == null && !_contextClick) || _trackpadPosition != null;
+    _longPress?.cancel();
+    _pendingTap = null;
+    _contextClick = false;
     _pointer = null;
     _resetTrackpad();
     if (touching) send?.call('cancel', Offset.zero, Offset.zero, false);
@@ -94,22 +103,44 @@ class _ReceiverPointerState extends State<ReceiverPointer> with WidgetsBindingOb
     return Listener(
       behavior: HitTestBehavior.opaque,
       onPointerDown: (event) {
-        if (_hasGesture || event.kind != PointerDeviceKind.mouse ||
+        if (_hasGesture || (event.kind != PointerDeviceKind.mouse &&
+            !(widget.allowTouch && event.kind == PointerDeviceKind.touch)) ||
             event.buttons != kPrimaryMouseButton || !video.contains(event.localPosition)) {
           return;
         }
         _pointer = event.pointer;
-        send('down', event.localPosition);
+        if (event.kind == PointerDeviceKind.touch) {
+          _pendingTap = event.localPosition;
+          _longPress = Timer(kLongPressTimeout, () {
+            _contextClick = true;
+            _pendingTap = null;
+            send('secondary', event.localPosition);
+          });
+        } else {
+          send('down', event.localPosition);
+        }
       },
       onPointerMove: (event) {
-        if (event.pointer != _pointer) return;
+        if (event.pointer != _pointer || _contextClick) return;
+        final origin = _pendingTap;
+        if (origin != null) {
+          if ((event.localPosition - origin).distance < kTouchSlop) return;
+          _longPress?.cancel();
+          _pendingTap = null;
+          send('down', origin);
+        }
         if (_canMove(event.timeStamp)) send('move', event.localPosition);
       },
       onPointerUp: (event) {
         if (event.pointer != _pointer) return;
         _pointer = null;
         _lastMove = null;
-        send('up', event.localPosition);
+        _longPress?.cancel();
+        final origin = _pendingTap;
+        _pendingTap = null;
+        if (origin != null) send('down', origin);
+        if (!_contextClick) send('up', event.localPosition);
+        _contextClick = false;
       },
       onPointerCancel: (event) {
         if (event.pointer == _pointer) _cancel(widget.onPointer);

@@ -17,6 +17,13 @@ class CastMedia {
   final void Function() onConnected;
   final renderer = RTCVideoRenderer();
   static const _native = MethodChannel('app.twist.cast/capture');
+  static const _desktopInput = MethodChannel('app.twist.cast/desktop-input');
+  static bool get _desktop => Platform.isWindows || Platform.isMacOS || Platform.isLinux;
+  static const desktopKeys = {'Enter', 'Backspace', 'Tab', 'Escape', 'Left', 'Right', 'Up', 'Down'};
+  bool _desktopControlOffered = false;
+  bool _peerDesktopInput = false;
+  bool get canUseDesktopInput => canSendPointer && _peerDesktopInput;
+  bool get _supportsInput => _peerSupportsTouch || _peerDesktopInput;
   RTCPeerConnection? _peer;
   CastDiagnostics? _diagnostics;
   MediaStream? _stream;
@@ -32,10 +39,18 @@ class CastMedia {
   bool _peerSupportsNavigation = false;
   bool remoteTouchEnabled = false;
   bool get canSendPointer => !_closed && !_sending && _reportedPlaying && remoteTouchEnabled;
-  bool get canEnableRemoteTouch => Platform.isAndroid && _sending && _peerSupportsTouch && _reportedPlaying && !_closed;
+  bool get canEnableRemoteTouch => _sending && ((Platform.isAndroid && _peerSupportsTouch) || (_desktop && _peerDesktopInput)) && _reportedPlaying && !_closed;
 
   Future<bool> setRemoteTouch(bool enabled) async {
     if (!canEnableRemoteTouch) return false;
+    if (_desktop) {
+      if (enabled && await _desktopInput.invokeMethod<bool>('enable') != true) return false;
+      if (_closed) return false;
+      remoteTouchEnabled = enabled;
+      if (!enabled) await _desktopInput.invokeMethod<void>('disable');
+      if (!_closed) send({'type': 'touch-state', 'enabled': enabled});
+      return enabled;
+    }
     if (enabled && await _native.invokeMethod<bool>('remoteTouchAvailable') != true) {
       if (!_closed) await _native.invokeMethod<void>('remoteTouchSettings');
       return false;
@@ -54,6 +69,12 @@ class CastMedia {
       'landscape': landscape});
   }
 
+  void sendDesktopKey(String key, [String? text]) {
+    if (!canUseDesktopInput) return;
+    if (key == 'text' ? text == null || text.isEmpty || text.length > 256 : !desktopKeys.contains(key)) return;
+    send({'type': 'pointer', 'action': 'key', 'key': key, if (key == 'text') 'text': text});
+  }
+
   bool get canSendNavigation => canSendPointer && _peerSupportsNavigation;
 
   void sendNavigation(RemoteNavigation action) {
@@ -64,11 +85,24 @@ class CastMedia {
   Future<void> _receivePointer(Map<String, dynamic> message) async {
     if (!canEnableRemoteTouch || !remoteTouchEnabled) return;
     final action = message['action'];
-    if (RemoteNavigation.values.any((entry) => entry.name == action)) {
+    if (_desktop && action == 'key') {
+      final key = message['key'], text = message['text'];
+      if (key is! String || (key == 'text'
+          ? text is! String || text.isEmpty || text.length > 256
+          : !desktopKeys.contains(key))) {
+        return;
+      }
+      await _desktopInput.invokeMethod<void>('key', {'key': key, if (key == 'text') 'text': text});
+      return;
+    }
+    if (Platform.isAndroid && RemoteNavigation.values.any((entry) => entry.name == action)) {
       await _native.invokeMethod<void>('remotePointer', {'action': action});
       return;
     }
-    if (!const {'down', 'move', 'up', 'cancel', 'scroll'}.contains(action)) return;
+    if (!const {'down', 'move', 'up', 'cancel', 'scroll'}.contains(action) &&
+        !(_desktop && action == 'secondary')) {
+      return;
+    }
     final args = <String, dynamic>{'action': action, 'landscape': message['landscape'] == true};
     for (final field in ['x', 'y', 'dx', 'dy']) {
       final value = message[field];
@@ -77,7 +111,11 @@ class CastMedia {
       if (value < (axis ? 0 : -0.35) || value > (axis ? 1 : 0.35)) return;
       args[field] = value.toDouble();
     }
-    await _native.invokeMethod<void>('remotePointer', args);
+    if (_desktop) {
+      await _desktopInput.invokeMethod<void>('pointer', args);
+    } else {
+      await _native.invokeMethod<void>('remotePointer', args);
+    }
   }
 
   Future<void> prepare() async {
@@ -92,6 +130,7 @@ class CastMedia {
     _peer = await createPeerConnection({'iceServers': <dynamic>[], 'sdpSemantics': 'unified-plan'});
     if (_closed) { await _peer?.dispose(); return; }
     _diagnostics = CastDiagnostics(_peer!, log, renderSnapshot: Platform.isMacOS ? () async {
+      if (_sending) return <String, num>{};
       final raw = await const MethodChannel('FlutterWebRTC.Method')
           .invokeMapMethod<String, dynamic>('videoRendererDiagnostics', {'textureId': renderer.textureId});
       return {for (final entry in (raw ?? <String, dynamic>{}).entries)
@@ -148,10 +187,24 @@ class CastMedia {
       if (_closed) { await _native.invokeMethod<void>('stop'); return; }
     }
     if (_closed) return;
-    final stream = await navigator.mediaDevices.getDisplayMedia({
-      'video': Platform.isIOS ? {'deviceId': 'broadcast'} : true,
-      'audio': true,
-    });
+    Object video = Platform.isIOS ? {'deviceId': 'broadcast'} : true;
+    if (_desktop) {
+      if (await _desktopInput.invokeMethod<bool>('captureAvailable') != true) {
+        throw StateError('Desktop capture unavailable');
+      }
+      if (_closed) return;
+      if (Platform.isMacOS) {
+        // The native capturer uses the main display, including on macOS 12.
+        _desktopControlOffered = true;
+      } else {
+        final screens = await desktopCapturer.getSources(types: [SourceType.Screen]);
+        if (_closed) return;
+        if (screens.isEmpty) throw StateError('No desktop screen');
+        video = {'deviceId': {'exact': screens.first.id}};
+        _desktopControlOffered = screens.length == 1;
+      }
+    }
+    final stream = await navigator.mediaDevices.getDisplayMedia({'video': video, 'audio': !_desktop});
     if (_closed) {
       for (final track in stream.getTracks()) { await track.stop(); }
       await stream.dispose();
@@ -159,8 +212,9 @@ class CastMedia {
       return;
     }
     _stream = stream;
+    if (stream.getVideoTracks().isEmpty) throw StateError('No screen video track');
     for (final track in stream.getVideoTracks()) { track.onEnded = onStopped; }
-    await setAudio(audio);
+    if (!_desktop) await setAudio(audio);
     for (final track in stream.getTracks()) {
       final sender = await _peer!.addTrack(track, stream);
       if (Platform.isAndroid && track.kind == 'audio') {
@@ -180,6 +234,7 @@ class CastMedia {
     await _peer!.setLocalDescription(offer);
     if (!_closed) {
       send({'type': 'offer', 'sdp': offer.sdp,
+        if (_desktopControlOffered) 'desktopInput': true,
         if (Platform.isAndroid) ...{'touch': true, 'navigation': true}});
     }
   }
@@ -227,15 +282,26 @@ class CastMedia {
     if (_closed || _peer == null) return;
     switch (message['type']) {
       case 'touch-state':
-        if (_sending || !_peerSupportsTouch || !_reportedPlaying) return;
+        if (_sending || !_supportsInput || !_reportedPlaying) return;
         remoteTouchEnabled = message['enabled'] == true;
         onConnected();
       case 'pointer':
-        await _receivePointer(message);
+        try {
+          await _receivePointer(message);
+        } on PlatformException {
+          if (!_desktop || _closed) rethrow;
+          // Permission or display topology can change while the stream continues.
+          remoteTouchEnabled = false;
+          await _desktopInput.invokeMethod<void>('disable');
+          if (!_closed) {
+            send({'type': 'touch-state', 'enabled': false});
+            onConnected();
+          }
+        }
       case 'playing':
         if (!_sending || _reportedPlaying) throw const FormatException('Unexpected playback acknowledgment');
         _reportedPlaying = true;
-      log.event('first-frame');
+        log.event('first-frame');
         onConnected();
       case 'offer':
       case 'answer':
@@ -246,14 +312,16 @@ class CastMedia {
         if (sdp is! String || sdp.length > 100000) throw const FormatException('Invalid SDP');
         await _peer!.setRemoteDescription(RTCSessionDescription(sdp, message['type'] as String));
         _remoteDescription = true;
-        _peerSupportsTouch = message['touch'] == true;
+        _peerSupportsTouch = message['touch'] == true && (!_sending || Platform.isAndroid);
+        _peerDesktopInput = message['desktopInput'] == true &&
+            (_sending ? _desktopControlOffered : Platform.isAndroid || Platform.isIOS);
         _peerSupportsNavigation = !_sending && message['navigation'] == true;
         for (final candidate in _pendingIce) { await _peer!.addCandidate(candidate); }
         _pendingIce.clear();
         if (!_sending) {
           final answer = await _peer!.createAnswer();
           await _peer!.setLocalDescription(answer);
-          send({'type': 'answer', 'sdp': answer.sdp, if (_peerSupportsTouch) 'touch': true});
+          send({'type': 'answer', 'sdp': answer.sdp, if (_peerDesktopInput) 'desktopInput': true, if (_peerSupportsTouch) 'touch': true});
         }
       case 'ice':
         final candidate = message['candidate'];
@@ -272,6 +340,10 @@ class CastMedia {
     Object? failure;
     Future<void> release(Future<void> Function() action) async {
       try { await action(); } catch (error) { failure ??= error; }
+    }
+    if (_desktop && _sending) {
+      remoteTouchEnabled = false;
+      await release(() => _desktopInput.invokeMethod<void>('disable'));
     }
     await release(() async { await _events?.cancel(); });
     if (Platform.isAndroid && _sending) {

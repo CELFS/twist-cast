@@ -175,9 +175,15 @@ class SecureSession {
 
   Future<void> approve() async {
     if (_transcript == null || _localApproved || _closed) return;
-    _localApproved = true;
-    _send({'type': 'approve'});
-    await _authorize();
+    // Serialize local approval with remote signaling. A fast sender may issue
+    // its offer as soon as it receives approval, while our renderer is starting.
+    _queue = _queue.then((_) async {
+      if (_closed || _localApproved) return;
+      _localApproved = true;
+      _send({'type': 'approve'});
+      await _authorize();
+    });
+    await _queue;
   }
 
   Future<void> _authorize() async {

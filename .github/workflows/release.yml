@@ -424,7 +424,7 @@ jobs:
         if: steps.release-policy.outputs.publish == 'true'
         run: |
           cat > build/release-notes.md <<'NOTES'
-          Native one-to-one phone screen sharing over a local network, with encrypted pairing and optional internal audio.
+          Share a phone or desktop screen over a paired local network connection. The desktop can grant the phone pointer and keyboard control for the session.
 
           - Android phones: download `android-arm64-v8a.apk` for most current phones. ARMv7 and x86_64 packages are also provided.
           - macOS: download `macos-universal.pkg` and follow the installer to install or replace TwistCast in Applications. Quit TwistCast when prompted. Supports Apple Silicon and Intel Macs. The installer is unsigned and the application is ad-hoc signed, without notarization; macOS may require approval in System Settings > Privacy & Security. The DMG is retained for in-app Sparkle updates.

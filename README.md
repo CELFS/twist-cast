@@ -6,19 +6,19 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.14 is a native Flutter client for one-to-one phone screen sharing over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
+TwistCast 0.1.15 is a native Flutter client for one-to-one screen sharing between a phone and a computer over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
 
 During a session, the receiver places its controls above the shared screen and hides setup guidance. Desktop windows fit the incoming screen aspect ratio, including orientation changes, while the picture remains fully visible. The application header includes the TwistCast icon, and the copyright and version stay at the bottom of the window.
 
 ## Platform status
 
-| Platform | Role in 0.1.14 | Implementation |
+| Platform | Role in 0.1.15 | Implementation |
 | --- | --- | --- |
-| Android | Share the full phone screen and internal audio | MediaProjection, AudioPlaybackCapture, foreground service |
-| iOS | Share the full phone screen and internal audio | ReplayKit broadcast extension and App Group socket |
-| Windows | Receive screen and audio | Native WebRTC renderer |
-| macOS | Receive screen and audio | Native WebRTC renderer |
-| Linux | Receive screen and audio | Native WebRTC renderer |
+| Android | Share the phone screen and internal audio, or view and control a desktop | MediaProjection, AudioPlaybackCapture, foreground service |
+| iOS | Share the phone screen and internal audio, or view and control a desktop | ReplayKit broadcast extension and App Group socket |
+| Windows | Receive a phone stream or share a desktop | WebRTC screen capture and SendInput |
+| macOS | Receive a phone stream or share the main display | WebRTC screen capture and Core Graphics input |
+| Linux | Receive a phone stream or share an X11 desktop | WebRTC screen capture and optional XTest input |
 
 This is a development version. Source implementation is not a claim of device certification. Actual capture, rotation, background behavior, audio synchronization, and device-specific permissions still require end-to-end testing. iOS, macOS, Windows, and Linux builds must be checked on their respective operating systems before distributing a release.
 
@@ -32,7 +32,7 @@ On Android, download progress remains visible in the update card. If a newer rel
 
 On macOS, select **Update and restart** and follow the Sparkle update window to download, install, and relaunch. The application sandbox remains enabled, and update archives are verified with the application's public signing key. Stop screen sharing before starting an update.
 
-## Connect
+## Share a phone screen
 
 1. Put the phone and computer on the same local network and open both clients.
 2. On the computer, select **Start receiving**. The invitation lasts two minutes.
@@ -45,7 +45,18 @@ Opening the application alone does not start a listener, advertise a device, sca
 
 Guest Wi-Fi, access-point isolation, VPN routing, and host firewalls can prevent devices from connecting. The receiver currently requires a private or link-local IPv4 address. If the computer has multiple network interfaces, select the address on the phone's network below the QR code. Discovery uses Bonjour/mDNS; signaling uses an ephemeral TLS port and media uses WebRTC host candidates. No public STUN, TURN, account service, or cloud relay is configured.
 
-### Mouse control
+## Share a computer screen with a phone
+
+Use TwistCast 0.1.15 or later on both devices.
+
+1. On the phone, select **Receive computer screen**. On the computer, select **Share computer screen**, then choose the phone from nearby devices.
+2. Compare the pairing code and approve on both devices. On macOS, allow Screen Recording when prompted. The phone shows the desktop and can pan or pinch to zoom. Desktop sharing sends video only.
+3. For remote input, turn on **Allow phone to control this computer** on the computer. On macOS, grant the requested Accessibility permission, then turn the switch on again. Tap to click, hold to right-click, or drag with one finger. The keyboard button sends text and navigation keys. Use the arrow buttons to scroll at the last touched point. Switch to **Pan and zoom** to inspect the picture without sending input.
+4. Turn the control switch off to continue viewing, or select **Stop** on either device to end sharing. Each new session starts in view-only mode.
+
+macOS shares the main display. Windows and Linux share the first screen reported by the capturer and offer control with one active monitor. Windows sends input at the app’s current privilege level. Linux desktop sharing requires an X11 session. Linux control also requires XTest, and text entry uses characters available in the active keyboard layout.
+
+### Mouse control of an Android phone
 
 On Android 8.0 or later, enable **Allow mouse control** on the phone once sharing starts. Enable TwistCast in Android accessibility settings when prompted, then return to TwistCast and enable the switch for this session. Use the desktop mouse to tap, press and hold, drag, or scroll within the shared screen. Two-finger trackpad pans over the shared screen act as single-finger swipes on Android. Use the receiver controls for Back, Home, and Recent apps. Mouse control turns off when the session ends.
 
@@ -77,7 +88,7 @@ Requirements:
 - Android: Java 17 and an Android SDK compatible with the Flutter project. The first build downloads the required Gradle, native SDK, and plugin artifacts.
 - macOS and iOS: full Xcode. Apple Command Line Tools alone cannot build these applications.
 - Windows: Visual Studio with Desktop development with C++ and the x64 ATL component.
-- Linux: Flutter desktop prerequisites, GTK development files, `libsecret-1-dev`, and a running Secret Service and Avahi service.
+- Linux: Flutter desktop prerequisites, GTK development files, `libsecret-1-dev`, and a running Secret Service and Avahi service. Install `libxtst-dev` before building for X11 remote input.
 
 Use Cursor or another Dart-compatible editor. A phone is not required to develop or run the desktop receiver. It is required to validate phone capture and system permissions.
 
@@ -137,7 +148,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.14`; the local development build number is `15`. CI assigns increasing build numbers independently for published updates.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.15`; the local development build number is `16`. CI assigns increasing build numbers independently for published updates.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -145,7 +156,7 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.14 shares the entire phone screen with one desktop receiver. Clipboard exchange, PC-to-phone casting, file transfer, window selection, and internet relaying are not part of this version.
+0.1.15 shares one screen in either direction between a phone and a computer on the same local network.
 
 ## License
 

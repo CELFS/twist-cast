@@ -6,17 +6,20 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../window/mac_window_surface.dart';
+import '../../l10n/generated/app_localizations.dart';
+import 'desktop_keyboard.dart';
 import 'receiver_toolbar.dart';
 import 'receiver_pointer.dart';
 
 class ReceiverView extends StatefulWidget {
   const ReceiverView({required this.renderer, required this.onStop,
-    required this.headerVisible, required this.onToggleHeader, this.showControls = true, this.onPointer, this.extraControl, this.navigation, super.key});
+    required this.headerVisible, required this.onToggleHeader, this.showControls = true, this.onPointer, this.onDesktopKey, this.extraControl, this.navigation, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool headerVisible;
   final bool showControls;
   final RemotePointer? onPointer;
+  final DesktopKey? onDesktopKey;
   final Widget? extraControl;
   final Widget? navigation;
   final VoidCallback onToggleHeader;
@@ -33,6 +36,9 @@ class _ReceiverViewState extends State<ReceiverView> {
   double? _requestedChrome;
   double? _pendingChrome;
   bool _resizeFailed = false;
+  bool _inspect = false;
+  Offset _lastTouch = const Offset(.5, .5);
+  bool get _mobile => Platform.isAndroid || Platform.isIOS;
 
   void _fit(RTCVideoValue value, Size viewport, double chromeHeight) {
     if (!(Platform.isMacOS || Platform.isWindows || Platform.isLinux) ||
@@ -80,11 +86,27 @@ class _ReceiverViewState extends State<ReceiverView> {
 
   @override
   Widget build(BuildContext context) {
+    final labels = AppLocalizations.of(context);
+    final desktopControl = widget.onDesktopKey != null;
     return Column(children: [
       if (widget.showControls) ReceiverToolbar(onStop: widget.onStop,
         onToggleHeader: widget.onToggleHeader, headerVisible: widget.headerVisible,
         resizeFailed: _resizeFailed, extraControl: widget.extraControl),
       if (widget.showControls) ?widget.navigation,
+      if (desktopControl) Wrap(children: [
+        IconButton(tooltip: _inspect ? labels.controlMode : labels.zoomMode,
+          icon: Icon(_inspect ? Icons.touch_app : Icons.zoom_in),
+          onPressed: () => setState(() => _inspect = !_inspect)),
+        IconButton(tooltip: labels.keyboard, icon: const Icon(Icons.keyboard),
+          onPressed: () => showModalBottomSheet<void>(context: context, isScrollControlled: true,
+            builder: (_) => DesktopKeyboard(send: (key, [text]) {
+              if (mounted) widget.onDesktopKey?.call(key, text);
+            }))),
+        for (final up in [true, false])
+          IconButton(tooltip: up ? labels.scrollUp : labels.scrollDown,
+            icon: Icon(up ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down),
+            onPressed: () => widget.onPointer?.call('scroll', _lastTouch, Offset(0, up ? -.1 : .1), false)),
+      ]),
       Expanded(child: LayoutBuilder(builder: (context, constraints) =>
         ValueListenableBuilder<RTCVideoValue>(valueListenable: widget.renderer, builder: (context, value, _) {
           final viewport = Size(constraints.maxWidth, constraints.maxHeight);
@@ -92,8 +114,12 @@ class _ReceiverViewState extends State<ReceiverView> {
           final hasFrameSize = value.width > 0 && value.height > 0;
           final video = RTCVideoView(widget.renderer,
             objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitContain);
-          return ReceiverPointer(videoSize: Size(value.aspectRatio, 1),
-            onPointer: hasFrameSize ? widget.onPointer : null,
+          final surface = ReceiverPointer(allowTouch: desktopControl, videoSize: Size(value.aspectRatio, 1),
+            onPointer: !hasFrameSize || widget.onPointer == null || (desktopControl && _inspect) ? null
+              : (action, point, scroll, landscape) {
+                if (action != 'cancel') _lastTouch = point;
+                widget.onPointer?.call(action, point, scroll, landscape);
+              },
             child: Platform.isMacOS && hasFrameSize
               ? Center(child: AspectRatio(
                   aspectRatio: value.aspectRatio,
@@ -103,6 +129,9 @@ class _ReceiverViewState extends State<ReceiverView> {
                   ),
                 ))
               : ColoredBox(color: Platform.isMacOS ? Colors.transparent : Colors.black, child: video));
+          if (!_mobile) return surface;
+          final inspect = !desktopControl || _inspect;
+          return InteractiveViewer(panEnabled: inspect, scaleEnabled: inspect, maxScale: 5, child: surface);
         }),
       )),
     ]);

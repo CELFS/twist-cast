@@ -64,7 +64,7 @@ class CastController extends ChangeNotifier {
       _connectionDeadline = Timer(const Duration(seconds: 90), () => stop(failed: true));
       final log = DiagnosticLog(sending ? 'sender' : 'receiver');
       diagnostics = log;
-      log.add({'audioEnabled': audio});
+      log.add({'audioEnabled': sending && isMobile && audio});
       final transport = CastMedia(send: session.send, log: log,
         onStopped: () { if (generation == _generation) stop(); },
         onConnected: () {
@@ -73,11 +73,17 @@ class CastController extends ChangeNotifier {
           _update(CastPhase.casting);
         });
       media = transport;
-      await transport.prepare();
-      if (generation != _generation) { await transport.close(); return; }
-      if (sending) await transport.share(audio: audio, title: notificationTitle, body: notificationBody);
-      if (!_disposed) notifyListeners();
-    }, onMessage: (message) async { await media?.handle(message); }, onClosed: () {
+      try {
+        await transport.prepare();
+        if (generation != _generation) { await transport.close(); return; }
+        if (sending) await transport.share(audio: audio, title: notificationTitle, body: notificationBody);
+        if (!_disposed && generation == _generation) notifyListeners();
+      } catch (_) {
+        if (generation == _generation) await stop(failed: true);
+      }
+    }, onMessage: (message) async {
+      if (generation == _generation) await media?.handle(message);
+    }, onClosed: () {
       if (generation == _generation) stop();
     });
     return session;
@@ -100,14 +106,14 @@ class CastController extends ChangeNotifier {
       if (generation != _generation) { await session.close(); return; }
       final broadcast = BonsoirBroadcast(service: BonsoirService(
         name: 'TwistCast ${nanoid(6)}', type: serviceType, port: port,
-        attributes: const {'v': '1'},
+        attributes: {'v': '1', 'receiver': isMobile ? 'phone' : 'desktop'},
       ));
       _broadcast = broadcast;
       await broadcast.initialize();
       if (generation != _generation) { await broadcast.stop(); return; }
       await broadcast.start();
       if (generation != _generation) { await broadcast.stop(); return; }
-      _update(CastPhase.receiving);
+      if (phase == CastPhase.preparing) _update(CastPhase.receiving);
     } catch (_) { if (generation == _generation) await stop(failed: true); }
   }
 
@@ -129,6 +135,7 @@ class CastController extends ChangeNotifier {
             event.service.resolve(discovery.serviceResolver);
           case BonsoirDiscoveryServiceResolvedEvent():
             if (event.service.attributes['v'] == '1' &&
+                (isMobile ? event.service.attributes['receiver'] != 'phone' : event.service.attributes['receiver'] == 'phone') &&
                 event.service.hostAddresses.any((address) => PairingInvitation.isLanAddress(address) &&
                     InternetAddress.tryParse(address)?.type == InternetAddressType.IPv4)) {
               devices[event.service.name] = event.service;
@@ -179,15 +186,15 @@ class CastController extends ChangeNotifier {
 
   bool remoteTouchBusy = false;
 
-  Future<void> setRemoteTouch(bool enabled) async {
+  Future<bool> setRemoteTouch(bool enabled) async {
     final transport = media;
-    if (remoteTouchBusy || transport == null || phase != CastPhase.casting) return;
+    if (remoteTouchBusy || transport == null || phase != CastPhase.casting) return false;
     remoteTouchBusy = true;
     notifyListeners();
     try {
-      await transport.setRemoteTouch(enabled);
+      return await transport.setRemoteTouch(enabled) == enabled;
     } on PlatformException {
-      // A missing or disabled system service leaves remote touch off.
+      return false;
     } finally {
       remoteTouchBusy = false;
       if (!_disposed) notifyListeners();

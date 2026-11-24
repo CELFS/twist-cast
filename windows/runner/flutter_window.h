@@ -9,6 +9,7 @@
 #include <flutter/standard_method_codec.h>
 
 #include "win32_window.h"
+#include "desktop_input.h"
 
 // A window that does nothing but host a Flutter view.
 class FlutterWindow : public Win32Window {
@@ -28,6 +29,8 @@ class FlutterWindow : public Win32Window {
   // The project to run.
   flutter::DartProject project_;
   std::unique_ptr<flutter::MethodChannel<flutter::EncodableValue>> window_channel_;
+
+  std::unique_ptr<DesktopInput> desktop_input_;
 
   // The Flutter instance hosted by this window.
   std::unique_ptr<flutter::FlutterViewController> flutter_controller_;

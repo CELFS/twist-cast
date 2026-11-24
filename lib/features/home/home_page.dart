@@ -78,6 +78,7 @@ class _HomePageState extends State<HomePage> {
       if (viewing) {
         final media = _cast.media!;
         return ReceiverPage(renderer: media.renderer,
+          onDesktopKey: media.canUseDesktopInput ? media.sendDesktopKey : null,
           onPointer: media.canSendPointer ? media.sendPointer : null,
           navigation: media.canSendNavigation ? ReceiverNavigation(onNavigate: media.sendNavigation) : null,
           onStop: _cast.stop, header: header,
@@ -96,7 +97,7 @@ class _HomePageState extends State<HomePage> {
             : const EdgeInsets.all(24),
           child: ConstrainedBox(constraints: const BoxConstraints(maxWidth: 960),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              Text(_cast.isMobile ? text.shareTitle : text.receiveTitle,
+              Text(text.shareScreenTitle,
                 style: Platform.isMacOS
                   ? theme.textTheme.headlineSmall?.copyWith(fontSize: 22)
                   : theme.textTheme.headlineMedium),
@@ -116,8 +117,13 @@ class _HomePageState extends State<HomePage> {
                       FilledButton.icon(onPressed: _scan, icon: const Icon(Icons.qr_code_scanner), label: Text(text.scanQr)),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(onPressed: _installingUpdate ? null : _cast.search, icon: const Icon(Icons.search), label: Text(text.findDevices)),
-                    ] else
+                    ] else ...[
                       FilledButton.icon(onPressed: _installingUpdate ? null : _cast.receive, icon: const Icon(Icons.cast), label: Text(text.startReceiving)),
+                    ],
+                    const SizedBox(height: 12),
+                    OutlinedButton.icon(onPressed: _installingUpdate ? null : (_cast.isMobile ? _cast.receive : _cast.search),
+                      icon: Icon(_cast.isMobile ? Icons.smartphone : Icons.screen_share_outlined),
+                      label: Text(_cast.isMobile ? text.receiveDesktop : text.shareDesktop)),
                   ],
                 ))),
               ],
@@ -128,14 +134,14 @@ class _HomePageState extends State<HomePage> {
               ],
               if (_cast.phase == CastPhase.receiving) Card(child: Padding(
                 padding: const EdgeInsets.all(24), child: Column(children: [
-                  Text(text.scanHint),
+                  Text(_cast.isMobile ? text.phoneReceiveHint : text.scanHint),
                   const SizedBox(height: 16),
-                  if (_cast.qr != null) ConstrainedBox(constraints: const BoxConstraints(maxWidth: 284),
+                  if (!_cast.isMobile && _cast.qr != null) ConstrainedBox(constraints: const BoxConstraints(maxWidth: 284),
                     child: Container(color: Colors.white, padding: const EdgeInsets.all(12),
                       child: QrImageView(data: _cast.qr!, backgroundColor: Colors.white))),
                   const SizedBox(height: 12),
                   Text(text.invitationExpires),
-                  if (_cast.addresses.length > 1) DropdownButton<String>(
+                  if (!_cast.isMobile && _cast.addresses.length > 1) DropdownButton<String>(
                     value: _cast.selectedAddress,
                     items: _cast.addresses.map((value) => DropdownMenuItem(value: value, child: Text(value))).toList(),
                     onChanged: (value) { if (value != null) _cast.selectAddress(value); },
@@ -147,9 +153,9 @@ class _HomePageState extends State<HomePage> {
               if (_cast.phase == CastPhase.searching) ...[
                 const LinearProgressIndicator(),
                 const SizedBox(height: 16),
-                Text(text.searchHint),
+                Text(_cast.isMobile ? text.searchHint : text.desktopSearchHint),
                 for (final device in _cast.devices.values) Card(child: ListTile(
-                  leading: const Icon(Icons.computer), title: Text(device.name),
+                  leading: Icon(_cast.isMobile ? Icons.computer : Icons.smartphone), title: Text(device.name),
                   trailing: const Icon(Icons.chevron_right), onTap: () => _cast.connectDevice(device),
                 )),
               ],
@@ -162,11 +168,16 @@ class _HomePageState extends State<HomePage> {
               ],
               if (_cast.media?.canEnableRemoteTouch == true) ...[
                 const SizedBox(height: 16),
-                SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(text.remoteTouch),
-                  subtitle: Text(text.remoteTouchHint), value: _cast.media!.remoteTouchEnabled,
-                  onChanged: _cast.remoteTouchBusy ? null : _cast.setRemoteTouch),
+                SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(_cast.isMobile ? text.remoteTouch : text.desktopControl),
+                  subtitle: Text(_cast.isMobile ? text.remoteTouchHint : text.desktopControlHint), value: _cast.media!.remoteTouchEnabled,
+                  onChanged: _cast.remoteTouchBusy ? null : (enabled) async {
+                    final ok = await _cast.setRemoteTouch(enabled);
+                    if (!ok && enabled && !_cast.isMobile && context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text.desktopControlFailed)));
+                    }
+                  }),
               ],
-              if (_cast.isMobile) ...[
+              if (_cast.isMobile && (!active || _cast.sending)) ...[
                 const SizedBox(height: 16),
                 SwitchListTile(contentPadding: EdgeInsets.zero, title: Text(text.internalAudio),
                   subtitle: Text(text.audioHint), value: _cast.audio,

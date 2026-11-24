@@ -10,10 +10,11 @@ import 'receiver_toolbar.dart';
 import 'receiver_pointer.dart';
 import 'receiver_view.dart';
 import 'display_power.dart';
+import 'desktop_keyboard.dart';
 
 class ReceiverPage extends StatefulWidget {
   const ReceiverPage({required this.renderer, required this.onStop,
-    required this.header, this.diagnostics, this.onPointer, this.navigation, this.canSetDisplayPower = false, super.key});
+    required this.header, this.diagnostics, this.onPointer, this.onDesktopKey, this.navigation, this.canSetDisplayPower = false, super.key});
   final RTCVideoRenderer renderer;
   final VoidCallback onStop;
   final bool canSetDisplayPower;
@@ -21,6 +22,7 @@ class ReceiverPage extends StatefulWidget {
   final Widget? diagnostics;
   final Widget? navigation;
   final RemotePointer? onPointer;
+  final DesktopKey? onDesktopKey;
 
   @override
   State<ReceiverPage> createState() => _ReceiverPageState();
@@ -86,6 +88,7 @@ class _ReceiverPageState extends State<ReceiverPage> {
       padding: EdgeInsets.all(Platform.isMacOS ? MacWindowSurface.inset : 0),
       child: Stack(children: [
       Positioned.fill(child: ReceiverView(renderer: widget.renderer,
+        onDesktopKey: widget.onDesktopKey,
         onPointer: Platform.isMacOS && _showHeader ? null : widget.onPointer,
         onStop: widget.onStop, headerVisible: _showHeader, showControls: !_nativeControls,
         navigation: widget.navigation,

@@ -26,6 +26,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  desktop_input_ = std::make_unique<DesktopInput>(flutter_controller_->engine()->messenger());
   window_channel_ = RegisterWindowSizing(flutter_controller_->engine()->messenger(), GetHandle());
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
@@ -42,6 +43,7 @@ bool FlutterWindow::OnCreate() {
 }
 
 void FlutterWindow::OnDestroy() {
+  desktop_input_.reset();
   window_channel_.reset();
   if (flutter_controller_) {
     flutter_controller_ = nullptr;

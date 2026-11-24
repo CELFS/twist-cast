@@ -73,6 +73,9 @@ class MainFlutterWindow: NSWindow {
     self.setFrame(windowFrame, display: true)
 
     RegisterGeneratedPlugins(registry: flutterViewController)
+    let desktopInput = DesktopInput()
+    FlutterMethodChannel(name: "app.twist.cast/desktop-input", binaryMessenger: flutterViewController.engine.binaryMessenger)
+      .setMethodCallHandler { call, result in desktopInput.handle(call, result: result) }
     let diagnostics = DiagnosticExport()
     FlutterMethodChannel(name: "app.twist.cast/diagnostics", binaryMessenger: flutterViewController.engine.binaryMessenger)
       .setMethodCallHandler { call, result in diagnostics.handle(call, result: result) }

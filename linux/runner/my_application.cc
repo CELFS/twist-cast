@@ -5,6 +5,8 @@
 
 #include "flutter/generated_plugin_registrant.h"
 
+void RegisterDesktopInput(FlView* view);
+
 struct _MyApplication {
   GtkApplication parent_instance;
   char** dart_entrypoint_arguments;
@@ -57,6 +59,7 @@ static void my_application_activate(GApplication* application) {
 
   fl_register_plugins(FL_PLUGIN_REGISTRY(view));
   RegisterWindowSizing(view, window);
+  RegisterDesktopInput(view);
 
   gtk_widget_grab_focus(GTK_WIDGET(view));
 }

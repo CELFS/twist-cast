@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.15 - Unreleased
+
+- Share a desktop screen with an Android phone or iPhone over a paired LAN connection.
+- Allow touch and keyboard control per session, with a separate pan and zoom mode for viewing.
+
 ## 0.1.14 - Unreleased
 
 - Add a Windows x64 installer for the desktop receiver to GitHub Releases and focused workflow builds.
