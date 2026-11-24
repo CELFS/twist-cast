@@ -9,10 +9,11 @@ import 'package:nanoid/nanoid.dart';
 import '../../core/device_identity.dart';
 import '../../core/pairing_invitation.dart';
 import '../../core/secure_session.dart';
+import '../../core/recent_device.dart';
 import 'cast_media.dart';
 import 'diagnostic_log.dart';
 
-enum CastPhase { idle, preparing, receiving, searching, pairing, connecting, casting, ended, failed }
+enum CastPhase { idle, preparing, receiving, searching, recent, pairing, connecting, casting, ended, failed }
 
 class CastController extends ChangeNotifier {
   static const serviceType = '_twistcast._tcp';
@@ -28,6 +29,32 @@ class CastController extends ChangeNotifier {
   List<String> addresses = [];
   String? selectedAddress;
   final devices = <String, BonsoirService>{};
+  final _history = DeviceIdentity.recentStore();
+  List<RecentDevice> get recentDevices => _history.devices;
+  RecentDevice? reconnecting;
+  RecentDevice? receivingFrom;
+  bool recentNotFound = false;
+
+  Future<void> loadRecent() async {
+    try {
+      await _history.load();
+      if (!_disposed) notifyListeners();
+    } on Exception { /* Secure storage may be unavailable. */ }
+  }
+
+  Future<void> removeRecent(RecentDevice device) async {
+    if (phase == CastPhase.recent) await stop();
+    await _history.remove(device.id);
+    if (!_disposed) notifyListeners();
+  }
+
+  BonsoirService? receiverFor(RecentDevice device) {
+    for (final service in devices.values) {
+      if (device.matches(service.attributes['r'])) return service;
+    }
+    return null;
+  }
+
   DeviceIdentity? _identity;
   SecureSession? _session;
   CastMedia? media;
@@ -48,11 +75,18 @@ class CastController extends ChangeNotifier {
   void _update(CastPhase value) { phase = value; if (!_disposed) notifyListeners(); }
   void selectAddress(String address) { selectedAddress = address; notifyListeners(); }
 
-  Future<SecureSession> _newSession(int generation) async {
+  Future<SecureSession> _newSession(int generation, {String? expectedDevice}) async {
     _identity ??= await DeviceIdentity.load();
     if (generation != _generation) throw StateError('Cancelled');
     late SecureSession session;
-    session = SecureSession(identity: _identity!, onPairing: (code, known) {
+    session = SecureSession(identity: _identity!, expectedDevice: expectedDevice,
+      onRecentDevice: (device) async {
+        if (generation != _generation) return;
+        try {
+          await _history.remember(device);
+          if (!_disposed) notifyListeners();
+        } on Exception { /* History is optional during casting. */ }
+      }, onPairing: (code, known) {
       if (generation != _generation) return;
       comparison = code;
       knownPeer = known;
@@ -89,9 +123,11 @@ class CastController extends ChangeNotifier {
     return session;
   }
 
-  Future<void> receive() async {
+  Future<void> receive({RecentDevice? from}) async {
+    final generation = _generation + 1;
     await stop();
-    final generation = ++_generation;
+    if (generation != _generation || _disposed) return;
+    receivingFrom = from;
     sending = false;
     _update(CastPhase.preparing);
     try {
@@ -100,13 +136,15 @@ class CastController extends ChangeNotifier {
           .where(PairingInvitation.isLanAddress).toSet().toList();
       if (addresses.isEmpty) throw StateError('No LAN interface');
       selectedAddress = addresses.first;
-      final session = await _newSession(generation);
+      final session = await _newSession(generation, expectedDevice: from?.id);
       _session = session;
       final port = await session.listen();
       if (generation != _generation) { await session.close(); return; }
+      final profile = await _identity!.localProfile();
+      if (generation != _generation) return;
       final broadcast = BonsoirBroadcast(service: BonsoirService(
         name: 'TwistCast ${nanoid(6)}', type: serviceType, port: port,
-        attributes: {'v': '1', 'receiver': isMobile ? 'phone' : 'desktop'},
+        attributes: {'v': '1', 'receiver': isMobile ? 'phone' : 'desktop', 'r': profile.advertisement()},
       ));
       _broadcast = broadcast;
       await broadcast.initialize();
@@ -117,12 +155,28 @@ class CastController extends ChangeNotifier {
     } catch (_) { if (generation == _generation) await stop(failed: true); }
   }
 
-  Future<void> search() async {
+  Future<void> search() => _search();
+  Future<void> refreshRecent() => _search(recent: true);
+
+  Future<void> connectRecent(RecentDevice device) async {
+    if (phase == CastPhase.recent) {
+      final service = receiverFor(device);
+      if (service != null) {
+        await connectDevice(service, expectedDevice: device.id);
+        return;
+      }
+    }
+    await _search(recent: true, target: device);
+  }
+
+  Future<void> _search({bool recent = false, RecentDevice? target}) async {
+    final generation = _generation + 1;
     await stop();
-    final generation = ++_generation;
+    if (generation != _generation || _disposed) return;
+    reconnecting = target;
     sending = true;
     devices.clear();
-    _update(CastPhase.searching);
+    _update(recent ? CastPhase.recent : CastPhase.searching);
     try {
       final discovery = BonsoirDiscovery(type: serviceType);
       _discovery = discovery;
@@ -134,28 +188,34 @@ class CastController extends ChangeNotifier {
           case BonsoirDiscoveryServiceFoundEvent():
             event.service.resolve(discovery.serviceResolver);
           case BonsoirDiscoveryServiceResolvedEvent():
-            if (event.service.attributes['v'] == '1' &&
+            if (event.service.port > 0 && event.service.port <= 65535 && event.service.attributes['v'] == '1' &&
                 (isMobile ? event.service.attributes['receiver'] != 'phone' : event.service.attributes['receiver'] == 'phone') &&
                 event.service.hostAddresses.any((address) => PairingInvitation.isLanAddress(address) &&
                     InternetAddress.tryParse(address)?.type == InternetAddressType.IPv4)) {
               devices[event.service.name] = event.service;
-              notifyListeners();
+              if (target != null && target.matches(event.service.attributes['r'])) {
+                unawaited(connectDevice(event.service, expectedDevice: target.id));
+              } else {
+                notifyListeners();
+              }
             }
           case BonsoirDiscoveryServiceLostEvent():
             devices.remove(event.service.name);
             notifyListeners();
           default: break;
         }
-      }, onError: (_) => stop(failed: true));
+      }, onError: (_) { if (generation == _generation) stop(failed: true); });
       await discovery.start();
       if (generation != _generation) { await discovery.stop(); return; }
-      _searchDeadline = Timer(const Duration(minutes: 2), stop);
+      _searchDeadline = Timer(recent ? const Duration(seconds: 25) : const Duration(minutes: 2), () {
+        if (generation == _generation) stop(recentMiss: recent && (target != null || !recentDevices.any((d) => receiverFor(d) != null)));
+      });
     } catch (_) { if (generation == _generation) await stop(failed: true); }
   }
 
-  Future<void> connectDevice(BonsoirService device) => _connect(
+  Future<void> connectDevice(BonsoirService device, {String? expectedDevice}) => _connect(
     device.hostAddresses.firstWhere((address) => PairingInvitation.isLanAddress(address) &&
-        InternetAddress.tryParse(address)?.type == InternetAddressType.IPv4), device.port,
+        InternetAddress.tryParse(address)?.type == InternetAddressType.IPv4), device.port, expectedDevice: expectedDevice,
   );
 
   Future<void> scanResult(String value) async {
@@ -165,13 +225,14 @@ class CastController extends ChangeNotifier {
     } catch (_) { await stop(failed: true); }
   }
 
-  Future<void> _connect(String host, int port, {PairingInvitation? invitation}) async {
+  Future<void> _connect(String host, int port, {PairingInvitation? invitation, String? expectedDevice}) async {
+    final generation = _generation + 1;
     await stop();
-    final generation = ++_generation;
+    if (generation != _generation || _disposed) return;
     sending = true;
     _update(CastPhase.preparing);
     try {
-      final session = await _newSession(generation);
+      final session = await _newSession(generation, expectedDevice: expectedDevice);
       _session = session;
       await session.connect(host, port, invitation: invitation);
       if (generation != _generation) { await session.close(); return; }
@@ -227,8 +288,13 @@ class CastController extends ChangeNotifier {
     if (discovery != null) { try { await discovery.stop(); } catch (_) { /* Already stopped. */ } }
   }
 
-  Future<void> stop({bool failed = false}) async {
-    ++_generation;
+  Future<void> stop({bool failed = false, bool recentMiss = false}) async {
+    final generation = ++_generation;
+    final wasChecking = phase == CastPhase.recent;
+    reconnecting = null;
+    receivingFrom = null;
+    devices.clear();
+    recentNotFound = recentMiss;
     _connectionDeadline?.cancel();
     final session = _session;
     final transport = media;
@@ -238,9 +304,10 @@ class CastController extends ChangeNotifier {
     comparison = null;
     approved = false;
     // Stop capture before waiting for network/discovery shutdown.
+    final stoppingDiscovery = _stopDiscovery();
     try { await transport?.close(); } catch (_) { failed = true; }
-    await Future.wait([_stopDiscovery(), if (session != null) session.close()]);
-    _update(failed ? CastPhase.failed : CastPhase.ended);
+    await Future.wait([stoppingDiscovery, if (session != null) session.close()]);
+    if (generation == _generation) _update(failed ? CastPhase.failed : wasChecking ? CastPhase.idle : CastPhase.ended);
   }
 
   @override

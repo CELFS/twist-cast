@@ -5,13 +5,20 @@ import 'dart:math';
 
 import 'device_identity.dart';
 import 'pairing_invitation.dart';
+import 'recent_device.dart';
 
 /// TLS protects signaling. Explicit comparison authenticates discovery pairing;
 /// QR pairing additionally pins the receiver's TLS certificate out of band.
 class SecureSession {
   SecureSession({required this.identity, required this.onPairing,
-    required this.onAuthorized, required this.onMessage, required this.onClosed});
+    required this.onAuthorized, required this.onMessage, required this.onClosed,
+    this.onRecentDevice, this.expectedDevice});
   final DeviceIdentity identity;
+  final String? expectedDevice;
+  final Future<void> Function(RecentDevice)? onRecentDevice;
+  bool _exchangeProfiles = false;
+  bool _receivedProfile = false;
+  String? _verifiedKey;
   final void Function(String code, bool known) onPairing;
   final Future<void> Function() onAuthorized;
   final Future<void> Function(Map<String, dynamic>) onMessage;
@@ -46,6 +53,10 @@ class SecureSession {
     _token = _secret();
     _expires = DateTime.now().add(const Duration(minutes: 2));
     _server = await HttpServer.bindSecure(InternetAddress.anyIPv4, 0, identity.serverContext());
+    if (_closed) {
+      await _server!.close(force: true);
+      throw StateError('Session closed');
+    }
     _server!.idleTimeout = const Duration(seconds: 10);
     _server!.listen(_accept, onError: (_) => close());
     _deadline = Timer(const Duration(minutes: 2), close);
@@ -68,10 +79,14 @@ class SecureSession {
     _reserved = true;
     try {
       _socket = await WebSocketTransformer.upgrade(request);
+      if (_closed) {
+        await _socket!.close();
+        return;
+      }
       _challenge = _secret();
       _serverPin = identity.fingerprint;
       _attach();
-      _send({'type': 'challenge', 'v': 1, 'nonce': _challenge});
+      _send({'type': 'challenge', 'v': 1, 'nonce': _challenge, if (onRecentDevice != null) 'recent': true});
     } catch (_) {
       await close();
     }
@@ -96,7 +111,11 @@ class SecureSession {
       Uri(scheme: 'wss', host: host, port: port, path: '/pair').toString(),
       customClient: _client,
     ).timeout(const Duration(seconds: 15));
-    if (_serverPin == null || _closed) {
+    if (_closed) {
+      await _socket!.close();
+      throw StateError('Session closed');
+    }
+    if (_serverPin == null) {
       await close();
       throw const FormatException('Missing certificate pin');
     }
@@ -132,13 +151,15 @@ class SecureSession {
     final type = data['type'];
     if (type == 'challenge' && !_receiver && _transcript == null) {
       if (data['v'] != 1) throw const FormatException('Version mismatch');
+      _exchangeProfiles = onRecentDevice != null && data['recent'] == true;
+      if (expectedDevice != null && !_exchangeProfiles) throw const FormatException('Device identity unavailable');
       final challenge = _field(data, 'nonce', 64);
       final nonce = _secret();
       final key = await identity.publicKey;
       _transcript = jsonEncode(['twistcast.v1', _serverPin, challenge, nonce, key]);
       _peer = _serverPin;
       _send({'type': 'hello', 'nonce': nonce, 'key': key,
-        'signature': await identity.sign(_transcript!), 'token': _token});
+        'signature': await identity.sign(_transcript!), 'token': _token, if (_exchangeProfiles) 'recent': true});
     } else if (type == 'hello' && _receiver && _transcript == null) {
       final nonce = _field(data, 'nonce', 64);
       final key = _field(data, 'key', 64);
@@ -150,14 +171,33 @@ class SecureSession {
       if (data['token'] != null && data['token'] != _token) {
         throw const FormatException('Invalid invitation secret');
       }
+      if (expectedDevice != null && expectedDevice != key) throw const FormatException('Unexpected sender');
       _peer = key;
-      _send({'type': 'compare'});
+      _verifiedKey = key;
+      _exchangeProfiles = onRecentDevice != null && data['recent'] == true;
+      _send({'type': 'compare', if (_exchangeProfiles) ...{
+        'key': await identity.publicKey,
+        'proof': await identity.sign('twistcast.receiver.v1/$_transcript'),
+      }});
       await _showComparison();
     } else if (type == 'compare' && !_receiver && _transcript != null && !_localApproved) {
+      if (_exchangeProfiles) {
+        final key = _field(data, 'key', 64);
+        if ((expectedDevice != null && key != expectedDevice) ||
+            base64Decode(key).length != 32 ||
+            !await DeviceIdentity.verify(key, 'twistcast.receiver.v1/$_transcript', _field(data, 'proof', 128))) {
+          throw const FormatException('Unexpected receiver identity');
+        }
+        _verifiedKey = key;
+      }
       await _showComparison();
     } else if (type == 'approve' && _transcript != null && !_remoteApproved) {
       _remoteApproved = true;
       await _authorize();
+    } else if (_authorized && _exchangeProfiles && type == 'recent-device' && !_receivedProfile) {
+      _receivedProfile = true;
+      final device = RecentDevice.parse(_verifiedKey!, data);
+      if (device != null) await onRecentDevice!(device);
     } else if (_authorized && (type == 'offer' || type == 'answer' || type == 'ice' || type == 'playing' ||
         type == 'touch-state' || type == 'pointer' || type == 'paste' || type == 'paste-result' || type == 'stop')) {
       if (type == 'stop') { await close(); } else { await onMessage(data); }
@@ -188,11 +228,17 @@ class SecureSession {
 
   Future<void> _authorize() async {
     if (!_localApproved || !_remoteApproved || _authorized || _authorizing || _closed) return;
+    if (_exchangeProfiles && _verifiedKey == null) throw const FormatException('Missing receiver proof');
     _authorizing = true;
     await identity.remember(_peer!);
     if (_closed) return;
     _authorized = true;
     _deadline?.cancel();
+    if (_exchangeProfiles) {
+      final profile = await identity.localProfile();
+      if (_closed) return;
+      _send({'type': 'recent-device', ...profile.profile});
+    }
     await onAuthorized();
   }
 

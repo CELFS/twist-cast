@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.1.17 - Unreleased
+
+- Reconnect to a recently paired phone or computer by name, check which devices are ready to receive, or wait for a specific sender.
+- Resolve the current receiver on demand and verify its saved identity before asking both devices to approve the session.
+
 ## 0.1.16 - Unreleased
 
 - Paste computer clipboard text into the focused Android field during an authorized control session using Command-V or Ctrl-V.

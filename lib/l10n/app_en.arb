@@ -48,7 +48,7 @@
   "sessionEnded": "Session ended. Your screen is no longer shared.",
   "notificationTitle": "TwistCast screen sharing",
   "notificationBody": "Your screen is being shared. Tap to return and stop.",
-  "versionLabel": "TwistCast 0.1.16",
+  "versionLabel": "TwistCast 0.1.17",
   "updateCheck": "Check for updates",
   "updateInstalled": "Installed",
   "updateLatest": "Latest",
@@ -63,7 +63,7 @@
   "updateDownloadFailed": "Download failed. Try again.",
   "updateInstallFailed": "Install failed. Check permissions.",
   "updateStopSession": "Stop sharing to update.",
-  "footerLabel": "© · 2026 · CELFS · v0.1.16",
+  "footerLabel": "© · 2026 · CELFS · v0.1.17",
   "resizeWindowFailed": "Could not resize the window automatically.",
   "showHeader": "Show title and language",
   "hideHeader": "Hide title and language",
@@ -110,5 +110,24 @@
   "pasteNoField": "Click an editable field on the phone first.",
   "pasteCopied": "Text copied to the phone. Use Paste in the target app.",
   "pasteUnavailable": "Paste unavailable. Check the clipboard and phone control permission.",
-  "pasteUnconfirmed": "The phone did not confirm the paste. Check the field before retrying."
+  "pasteUnconfirmed": "The phone did not confirm the paste. Check the field before retrying.",
+  "recentDevices": "Recent devices",
+  "recentCheck": "Find available receivers",
+  "recentShare": "Share my screen",
+  "recentReady": "Ready to receive",
+  "recentWaiting": "Looking for this device…",
+  "recentChecking": "Checking availability…",
+  "recentReceive": "Receive from this device",
+  "recentRemove": "Remove from recent devices",
+  "recentRemoveFailed": "Could not remove this device. Try again.",
+  "recentNotFound": "No matching receiver found. Connect both devices to the same Wi-Fi and start receiving on the other device.",
+  "recentHint": "Start receiving on the other device, then tap its name to share your screen.",
+  "recentReceiveName": "Waiting for {name} to share its screen…",
+  "@recentReceiveName": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  }
 }

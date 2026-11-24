@@ -6,13 +6,13 @@
 
 Private screen sharing across your devices.
 
-TwistCast 0.1.16 is a native Flutter client for one-to-one screen sharing between a phone and a computer over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
+TwistCast 0.1.17 is a native Flutter client for one-to-one screen sharing between a phone and a computer over a local network. It includes QR pairing, on-demand device discovery, explicit approval on both devices, encrypted transport, and an internal-audio switch. English is the default interface language; Simplified Chinese is also available. On macOS, receiver tools open from the titlebar button in a floating panel without shrinking the shared screen.
 
 During a session, the receiver places its controls above the shared screen and hides setup guidance. Desktop windows fit the incoming screen aspect ratio, including orientation changes, while the picture remains fully visible. The application header includes the TwistCast icon, and the copyright and version stay at the bottom of the window.
 
 ## Platform status
 
-| Platform | Role in 0.1.16 | Implementation |
+| Platform | Role in 0.1.17 | Implementation |
 | --- | --- | --- |
 | Android | Share the phone screen and internal audio, or view and control a desktop | MediaProjection, AudioPlaybackCapture, foreground service |
 | iOS | Share the phone screen and internal audio, or view and control a desktop | ReplayKit broadcast extension and App Group socket |
@@ -44,6 +44,12 @@ On macOS, select **Update and restart** and follow the Sparkle update window to 
 Opening the application alone does not start a listener, advertise a device, scan the network, or capture media. A receiver stops advertising after pairing begins. Each session requires approval, including sessions with previously paired identities. Only one phone can connect to a receiver at a time.
 
 Guest Wi-Fi, access-point isolation, VPN routing, and host firewalls can prevent devices from connecting. The receiver currently requires a private or link-local IPv4 address. If the computer has multiple network interfaces, select the address on the phone's network below the QR code. Discovery uses Bonjour/mDNS; signaling uses an ephemeral TLS port and media uses WebRTC host candidates. No public STUN, TURN, account service, or cloud relay is configured.
+
+## Reconnect to a recent device
+
+After both devices approve a session on version 0.1.17 or later, each home screen lists the other device under **Recent devices**. Start receiving on the destination and tap its name on the sender. **Find available receivers** checks which saved devices are currently receiving. Use a device’s menu to receive specifically from it or remove its shortcut.
+
+TwistCast keeps the ten most recently paired devices in local secure storage. A new invitation advertises a fresh lookup tag. The sender resolves the current LAN address and verifies the saved identity before showing the comparison code. Each connection still requires approval on both sides. After upgrading an older installation, pair once to add the shortcut.
 
 ## Share a computer screen with a phone
 
@@ -150,7 +156,7 @@ ios/                     iOS runner and broadcast extension
 macos/, windows/, linux/ Desktop runners
 ```
 
-The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.16`; the local development build number is `17`. CI assigns increasing build numbers independently for published updates.
+The package name is `twist_cast`. The application identifier is `app.twist.cast`. The version is `0.1.17`; the local development build number is `18`. CI assigns increasing build numbers independently for published updates.
 
 Record changes in [CHANGELOG.md](CHANGELOG.md).
 
@@ -158,7 +164,7 @@ The root `temp/` directory is ignored by Git and reserved for local documents. I
 
 ## Scope
 
-0.1.16 shares one screen in either direction between a phone and a computer on the same local network.
+0.1.17 shares one screen in either direction between a phone and a computer on the same local network.
 
 ## License
 

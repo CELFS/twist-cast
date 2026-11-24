@@ -7,6 +7,8 @@ import 'package:crypto/crypto.dart' as hashing;
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'recent_device.dart';
+
 /// Device secrets stay in the operating system's secure storage.
 class DeviceIdentity {
   DeviceIdentity._(this.keyPair, this.certificate, this.privateKey);
@@ -52,6 +54,21 @@ class DeviceIdentity {
   String get fingerprint => digest(base64Decode(certificate.split('-----')[2].replaceAll(RegExp(r'\s'), '')));
   Future<String> get publicKey async =>
       base64Encode((await keyPair.extractPublicKey()).bytes);
+
+  static RecentDeviceStore recentStore() => RecentDeviceStore(_storage);
+
+  Future<RecentDevice> localProfile() async {
+    final seed = await keyPair.extractPrivateKeyBytes();
+    final key = hashing.Hmac(hashing.sha256, seed).convert(utf8.encode('twistcast.recent-key.v1'));
+    final id = await publicKey;
+    var host = '';
+    try {
+      host = RecentDevice.cleanName(Platform.localHostname);
+    } on OSError { /* Use the device label below. */ }
+    final fallback = '${Platform.operatingSystem} · ${digest(utf8.encode(id)).substring(0, 6)}';
+    return RecentDevice(id: id, discoveryKey: base64.encode(key.bytes),
+      name: host.isEmpty || host.toLowerCase().startsWith('localhost') ? fallback : host);
+  }
 
   SecurityContext serverContext() => SecurityContext(withTrustedRoots: false)
     ..useCertificateChainBytes(utf8.encode(certificate))

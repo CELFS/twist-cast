@@ -16,6 +16,7 @@ import '../window/mac_window_surface.dart';
 import 'app_brand.dart';
 import 'app_footer.dart';
 import 'language_menu.dart';
+import 'recent_devices_card.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({required this.locale, required this.onLocaleChanged, super.key});
@@ -29,6 +30,12 @@ class _HomePageState extends State<HomePage> {
   final _cast = CastController();
   bool _scanning = false;
   bool _installingUpdate = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _cast.loadRecent();
+  }
 
   @override
   void dispose() { _cast.dispose(); super.dispose(); }
@@ -105,6 +112,11 @@ class _HomePageState extends State<HomePage> {
               const SizedBox(height: 8),
               Text(text.tagline, style: theme.textTheme.bodyLarge),
               const SizedBox(height: 24),
+              if (_cast.recentNotFound) _Notice(text: text.recentNotFound, icon: Icons.search_off),
+              if (_cast.recentDevices.isNotEmpty && (!active || _cast.phase == CastPhase.recent)) ...[
+                RecentDevicesCard(cast: _cast, enabled: !_installingUpdate && !_scanning),
+                const SizedBox(height: 16),
+              ],
               if (!active) ...[
                 if (_cast.phase == CastPhase.failed) _Notice(text: text.sessionError, icon: Icons.error_outline),
                 if (_cast.phase == CastPhase.ended) _Notice(text: text.sessionEnded, icon: Icons.check_circle_outline),
@@ -135,7 +147,9 @@ class _HomePageState extends State<HomePage> {
               ],
               if (_cast.phase == CastPhase.receiving) Card(child: Padding(
                 padding: const EdgeInsets.all(24), child: Column(children: [
-                  Text(_cast.isMobile ? text.phoneReceiveHint : text.scanHint),
+                  Text(_cast.receivingFrom != null
+                      ? text.recentReceiveName(_cast.receivingFrom!.name)
+                      : _cast.isMobile ? text.phoneReceiveHint : text.scanHint),
                   const SizedBox(height: 16),
                   if (!_cast.isMobile && _cast.qr != null) ConstrainedBox(constraints: const BoxConstraints(maxWidth: 284),
                     child: Container(color: Colors.white, padding: const EdgeInsets.all(12),

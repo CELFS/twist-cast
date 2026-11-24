@@ -21,6 +21,7 @@ import 'package:twist_cast/app.dart';
 import 'package:twist_cast/core/device_identity.dart';
 import 'package:twist_cast/core/pairing_invitation.dart';
 import 'package:twist_cast/core/secure_session.dart';
+import 'package:twist_cast/core/recent_device.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -76,7 +77,7 @@ void main() {
     expect(find.text('Start receiving'), findsOneWidget);
     expect(find.text('Share computer screen'), findsOneWidget);
     expect(find.byType(AppBrand), Platform.isMacOS ? findsNothing : findsOneWidget);
-    expect(find.text('© · 2026 · CELFS · v0.1.16'), findsOneWidget);
+    expect(find.text('© · 2026 · CELFS · v0.1.17'), findsOneWidget);
     if (Platform.isMacOS) {
       expect(tester.getSize(find.byType(AppFooter)).height, 20);
     } else {
@@ -387,11 +388,17 @@ void main() {
     final receiverReady = Completer<void>();
     final senderReady = Completer<void>();
     final received = Completer<Map<String, dynamic>>();
+    final seenSender = Completer<RecentDevice>();
+    final seenReceiver = Completer<RecentDevice>();
     final receiver = SecureSession(identity: receiverIdentity,
+      expectedDevice: await senderIdentity.publicKey,
+      onRecentDevice: (device) async => seenSender.complete(device),
       onPairing: (code, _) => receiverCode.complete(code),
       onAuthorized: () async => receiverReady.complete(),
       onMessage: (message) async => received.complete(message), onClosed: () {});
     final sender = SecureSession(identity: senderIdentity,
+      expectedDevice: await receiverIdentity.publicKey,
+      onRecentDevice: (device) async => seenReceiver.complete(device),
       onPairing: (code, _) => senderCode.complete(code),
       onAuthorized: () async => senderReady.complete(),
       onMessage: (_) async {}, onClosed: () {});
@@ -413,11 +420,28 @@ void main() {
     expect(senderReady.isCompleted, isFalse);
     expect(receiverReady.isCompleted, isFalse);
     expect(() => sender.send({'type': 'offer', 'sdp': 'unauthorized'}), throwsStateError);
+    expect(seenSender.isCompleted || seenReceiver.isCompleted, isFalse);
     await receiver.approve();
     await Future.wait([receiverReady.future, senderReady.future]).timeout(const Duration(seconds: 10));
+    final profiles = await Future.wait([seenSender.future, seenReceiver.future]).timeout(const Duration(seconds: 10));
+    expect(profiles.first.id, await senderIdentity.publicKey);
+    expect(profiles.last.matches((await receiverIdentity.localProfile()).advertisement()), isTrue);
     sender.send({'type': 'offer', 'sdp': 'authorized-payload'});
     expect((await received.future.timeout(const Duration(seconds: 10)))['sdp'], 'authorized-payload');
     await sender.close();
     expect(() => sender.send({'type': 'offer'}), throwsStateError);
+
+    // The receiver is genuine and reachable, but isn't the selected recent peer.
+    final mismatchClosed = Completer<void>();
+    final other = SecureSession(identity: receiverIdentity, onPairing: (_, _) {},
+      onRecentDevice: (_) async => fail('Unapproved profile'),
+      onAuthorized: () async => fail('Unexpected authorization'), onMessage: (_) async {}, onClosed: () {});
+    final targeted = SecureSession(identity: senderIdentity, expectedDevice: await senderIdentity.publicKey,
+      onPairing: (_, _) => fail('Unexpected receiver offered for pairing'), onRecentDevice: (_) async => fail('Unexpected profile'),
+      onAuthorized: () async => fail('Unexpected authorization'), onMessage: (_) async {}, onClosed: mismatchClosed.complete);
+    addTearDown(other.close);
+    addTearDown(targeted.close);
+    await targeted.connect(host, await other.listen());
+    await mismatchClosed.future.timeout(const Duration(seconds: 10));
   }, timeout: const Timeout(Duration(seconds: 90)));
 }
